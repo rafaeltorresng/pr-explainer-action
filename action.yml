@@ -14,9 +14,9 @@ inputs:
     required: false
     default: '5000'
   openrouter_model:
-    description: 'OpenRouter model identifier. Use openrouter/auto to let OpenRouter choose the model.'
+    description: 'OpenRouter model identifier. Users can override it with any model available in OpenRouter.'
     required: false
-    default: 'openrouter/auto'
+    default: 'deepseek/deepseek-v4-flash'
   output_file:
     description: 'Generated HTML filename.'
     required: false

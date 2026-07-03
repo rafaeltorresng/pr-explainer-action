@@ -27,16 +27,16 @@ O usuário continua livre para escolher o modelo via `openrouter_model`.
 
 Default recomendado:
 
-- `openrouter/auto`
+- `deepseek/deepseek-v4-flash`
 
 Exemplos de modelos fixos:
 
-- `deepseek/deepseek-chat`
+- `deepseek/deepseek-v4-flash`
 - `anthropic/claude-sonnet-4.5`
 - `openai/gpt-4.1`
 
-Se você quer menor atrito de adoção, use `openrouter/auto`.
-Se você quer previsibilidade máxima de custo e comportamento, fixe um modelo específico.
+O padrão desta action é um modelo fixo para dar previsibilidade de comportamento.
+Se o usuário quiser, ele ainda pode sobrescrever com qualquer modelo aceito pela OpenRouter.
 
 ## O Que a Action Faz
 
@@ -81,7 +81,7 @@ jobs:
         uses: rafaeltorres/pr-explainer-action@v1
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
-          openrouter_model: openrouter/auto
+          openrouter_model: deepseek/deepseek-v4-flash
           max_lines: '5000'
 ```
 
@@ -112,7 +112,7 @@ jobs:
         uses: rafaeltorres/pr-explainer-action@v1
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
-          openrouter_model: openrouter/auto
+          openrouter_model: deepseek/deepseek-v4-flash
 ```
 
 ## Inputs
@@ -121,7 +121,7 @@ jobs:
 | --- | --- | --- | --- |
 | `openrouter_api_key` | yes | - | Chave da OpenRouter. |
 | `max_lines` | no | `5000` | Máximo de linhas adicionadas + removidas antes de pular. |
-| `openrouter_model` | no | `openrouter/auto` | Modelo enviado para a OpenRouter. |
+| `openrouter_model` | no | `deepseek/deepseek-v4-flash` | Modelo enviado para a OpenRouter. O usuário pode trocar por qualquer modelo suportado. |
 | `output_file` | no | `pr-explanation.html` | Nome do HTML gerado. |
 | `artifact_name` | no | `pr-explanation-html` | Nome do artifact enviado. |
 | `base_ref` | no | vazio | Override da branch base usada no `git diff`. |

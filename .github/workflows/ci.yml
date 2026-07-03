@@ -38,7 +38,7 @@ jobs:
         shell: bash
         env:
           OPENROUTER_API_KEY: test
-          OPENROUTER_MODEL: openrouter/auto
+          OPENROUTER_MODEL: deepseek/deepseek-v4-flash
           OPENROUTER_MOCK_RESPONSE_PATH: mock.json
           GITHUB_EVENT_PATH: event.json
         run: |
