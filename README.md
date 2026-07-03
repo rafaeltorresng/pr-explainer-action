@@ -78,7 +78,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run PR Explainer
-        uses: rafaeltorres/pr-explainer-action@v1
+        uses: rafaeltorresng/pr-explainer-action@v1
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
           openrouter_model: deepseek/deepseek-v4-flash
@@ -109,7 +109,7 @@ jobs:
           fetch-depth: 0
 
       - name: Run PR Explainer
-        uses: rafaeltorres/pr-explainer-action@v1
+        uses: rafaeltorresng/pr-explainer-action@v1
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
           openrouter_model: deepseek/deepseek-v4-flash

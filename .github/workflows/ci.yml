@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  validate:
+  validate-script:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -52,3 +52,52 @@ jobs:
           grep -q 'Validation test' output.html
           grep -q 'Question 1.' output.html
           grep -q 'Background.' output.html
+
+  validate-composite-action:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Create local validation commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'validation\n' > .ci-validation.txt
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .ci-validation.txt
+          git commit -m "test: validate composite action flow"
+
+      - name: Generate mock OpenRouter response
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun -e 'const fs=require("node:fs"); const payload={choices:[{message:{content:JSON.stringify({background:"<p>Background.</p>",intuition:"<p>Intuition.</p>",diagrams:"<div>Diagram.</div>",codeWalkthrough:"<pre>const x = 1;</pre>",quiz:[{question:"Q1?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]},{question:"Q2?",options:["A","B","C","D"],correctOptionIndex:2,explanations:["e0","e1","e2","e3"]},{question:"Q3?",options:["A","B","C","D"],correctOptionIndex:3,explanations:["e0","e1","e2","e3"]},{question:"Q4?",options:["A","B","C","D"],correctOptionIndex:0,explanations:["e0","e1","e2","e3"]},{question:"Q5?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]}]})}}],usage:{prompt_tokens:111,completion_tokens:222,total_tokens:333}}; fs.writeFileSync("mock.json", JSON.stringify(payload));'
+
+      - name: Run composite action
+        uses: ./
+        env:
+          OPENROUTER_MOCK_RESPONSE_PATH: mock.json
+        with:
+          openrouter_api_key: test
+          openrouter_model: deepseek/deepseek-v4-flash
+          output_file: composite-output.html
+          artifact_name: composite-pr-explanation
+          base_ref: main
+          comment_on_pr: 'false'
+
+      - name: Assert composite action output
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f composite-output.html
+          grep -q 'Question 1.' composite-output.html
+          grep -q 'Background.' composite-output.html
