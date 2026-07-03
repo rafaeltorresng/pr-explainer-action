@@ -3,18 +3,18 @@ const { join } = require('node:path');
 
 const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
 if (!OPENROUTER_API_KEY) {
-  console.error('Erro: A variável de ambiente OPENROUTER_API_KEY não está configurada.');
+  console.error('Error: OPENROUTER_API_KEY is not configured.');
   process.exit(1);
 }
 
-const MODEL_NAME = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-chat';
+const MODEL_NAME = process.env.OPENROUTER_MODEL || 'deepseek/deepseek-v4-flash';
 const OPENROUTER_API_BASE_URL =
   process.env.OPENROUTER_API_BASE_URL || 'https://openrouter.ai/api/v1';
 
 const args = process.argv.slice(2);
 const diffFilePath = args[0];
 
-let prTitle = process.env.PR_TITLE || 'Mudanças no Código';
+let prTitle = process.env.PR_TITLE || 'Code Changes';
 let prNumber = process.env.PR_NUMBER || '0';
 
 const eventPath = process.env.GITHUB_EVENT_PATH;
@@ -26,7 +26,7 @@ if (eventPath && existsSync(eventPath)) {
       prNumber = String(eventData.pull_request.number || prNumber);
     }
   } catch (error) {
-    console.error('Falha ao ler o payload do evento do GitHub:', error);
+    console.error('Failed to read the GitHub event payload:', error);
   }
 }
 
@@ -35,11 +35,11 @@ const outputFilePath =
 
 function getDiffContent() {
   if (diffFilePath && existsSync(diffFilePath)) {
-    console.log(`Lendo diff a partir do arquivo: ${diffFilePath}`);
+    console.log(`Reading diff from file: ${diffFilePath}`);
     return readFileSync(diffFilePath, 'utf8');
   }
 
-  console.log('Nenhum arquivo de diff especificado. Buscando diff do git local...');
+  console.log('No diff file provided. Falling back to local git diff...');
   try {
     const { stdout, success } = Bun.spawnSync(['git', 'diff', 'origin/main...HEAD']);
     if (success && stdout) {
@@ -49,7 +49,7 @@ function getDiffContent() {
       }
     }
   } catch {
-    console.error('Falha ao rodar git diff origin/main...HEAD localmente.');
+    console.error('Failed to run local git diff origin/main...HEAD.');
   }
 
   try {
@@ -61,68 +61,68 @@ function getDiffContent() {
       }
     }
   } catch {
-    console.error('Falha ao rodar git diff HEAD~1 localmente.');
+    console.error('Failed to run local git diff HEAD~1.');
   }
 
-  console.error('Erro: Não foi possível obter o diff do código.');
+  console.error('Error: Unable to obtain a code diff.');
   process.exit(1);
 }
 
 const diffContent = getDiffContent();
 if (diffContent.length === 0) {
-  console.error('Erro: O diff do código está vazio.');
+  console.error('Error: The code diff is empty.');
   process.exit(1);
 }
 
-console.log(`Tamanho do diff a ser analisado: ${diffContent.length} bytes`);
+console.log(`Diff size to analyze: ${diffContent.length} bytes`);
 
 const templatePath = join(__dirname, 'template.html');
 if (!existsSync(templatePath)) {
-  console.error(`Erro: Arquivo de template não encontrado em ${templatePath}`);
+  console.error(`Error: Template file not found at ${templatePath}`);
   process.exit(1);
 }
 let htmlTemplate = readFileSync(templatePath, 'utf8');
 
-const systemInstruction = `Você é um Staff Software Engineer sênior no projeto SIP. Seu estilo de escrita é extremamente claro, fluído e pragmático, inspirado em Martin Kleppmann (autor de "Designing Data-Intensive Applications").
+const systemInstruction = `You are a senior Staff Software Engineer. Your writing style is clear, fluid, and pragmatic, inspired by Martin Kleppmann.
 
-Sua tarefa é analisar o git diff de um Pull Request e gerar uma documentação de review interativa e de altíssima qualidade técnica. Você deve retornar EXCLUSIVAMENTE um objeto JSON estruturado contendo as seguintes propriedades:
+Your task is to analyze a Pull Request git diff and generate a high-quality interactive review document. You must return ONLY a structured JSON object with these properties:
 
-1. "background": String HTML contendo uma explicação rica e detalhada sobre o contexto do sistema que está sendo modificado. Explique como a funcionalidade afetada operava anteriormente e as motivações arquiteturais por trás da mudança.
-2. "intuition": String HTML detalhando o conceito e a essência da mudança de código de forma intuitiva, usando analogias simples e dados de exemplo fictícios para ilustrar a lógica.
-3. "diagrams": String HTML contendo diagramas visuais estilizados usando elementos HTML/CSS (caixas com bordas, setas, flex/grid com Tailwind) para mostrar o fluxo de dados modificado ou a transição de estados. Não use diagramas ASCII, apenas blocos HTML limpos e coloridos.
-4. "codeWalkthrough": String HTML com um passo a passo de alto nível sobre os arquivos modificados, agrupando-os por importância e explicando os principais blocos alterados de forma compreensível. Para trechos de código, use as tags <pre class="font-mono bg-[#0c0c0c] border border-gray-800 p-4 rounded text-xs overflow-x-auto text-purple-300 my-2"> e certifique-se de que contenham white-space: pre-wrap em seu estilo.
-5. "quiz": Um array de exatamente 5 objetos. Cada objeto representa uma pergunta do quiz e deve ter o seguinte formato:
+1. "background": HTML string with a rich explanation of the existing system context relevant to the change. Explain how the affected functionality worked previously and the architectural motivations behind the change.
+2. "intuition": HTML string explaining the essence of the code change in an intuitive way, using simple analogies and small fictional examples.
+3. "diagrams": HTML string containing styled HTML/CSS diagrams using boxes, arrows, flex, and grid layouts to show the changed data flow or state transition. Do not use ASCII diagrams.
+4. "codeWalkthrough": HTML string with a high-level walkthrough of the modified files, grouped by importance and explained in a way that is easy to follow. For code snippets, use <pre class="font-mono bg-[#0c0c0c] border border-gray-800 p-4 rounded text-xs overflow-x-auto text-purple-300 my-2"> and ensure white-space: pre-wrap applies.
+5. "quiz": an array of exactly 5 objects. Each quiz object must follow this structure:
    {
-     "question": "Texto da pergunta de nível médio-difícil que testa se o leitor compreendeu a essência do PR",
-     "options": ["Opção 0", "Opção 1", "Opção 2", "Opção 3"],
+     "question": "A medium-to-hard question that tests whether the reader understood the essence of the PR",
+     "options": ["Option 0", "Option 1", "Option 2", "Option 3"],
      "correctOptionIndex": 2,
      "explanations": [
-       "Explicação detalhada sobre por que a Opção 0 está correta/incorreta",
-       "Explicação detalhada sobre por que a Opção 1 está correta/incorreta",
-       "Explicação detalhada sobre por que a Opção 2 está correta/incorreta",
-       "Explicação detalhada sobre por que a Opção 3 está correta/incorreta"
+       "Detailed explanation of why Option 0 is correct or incorrect",
+       "Detailed explanation of why Option 1 is correct or incorrect",
+       "Detailed explanation of why Option 2 is correct or incorrect",
+       "Detailed explanation of why Option 3 is correct or incorrect"
      ]
    }
 
-Regras Cruciais:
-- IDIOMA OBRIGATÓRIO: Toda a documentação gerada (background, intuition, diagrams, codeWalkthrough, perguntas, alternativas e explicações do quiz) DEVE ser escrita estritamente em português (pt-BR). Não misture termos em inglês, exceto nomes de funções, classes, arquivos ou palavras-chave de sintaxe de código que apareçam no diff.
-- O retorno DEVE ser um JSON válido. Não inclua Markdown de bloco de código (\`\`\`json) na sua resposta final, apenas o JSON bruto.
-- Não use emojis em lugar nenhum. A comunicação deve ser puramente profissional, séria e focada em engenharia.
-- Evite explicações superficiais. Aprofunde-se em transações, concorrência, estados de banco de dados, tratamentos de erros ou layouts de interface onde aplicável no diff.
-- DISTRIBUIÇÃO DAS RESPOSTAS DO QUIZ: Você DEVE variar o índice da resposta correta ("correctOptionIndex") de forma aleatória em cada uma das 5 questões (por exemplo, questão 1 com índice 2, questão 2 com índice 0, questão 3 com índice 3, etc.). NUNCA coloque a resposta correta sempre na primeira posição (índice 0) ou em uma mesma posição previsível em todas as questões.
-- CORES E ACESSIBILIDADE DOS DIAGRAMAS: Os diagramas em HTML que você gerar devem utilizar o tema de modo escuro consistente. Utilize as seguintes cores do Tailwind para fundos e textos contrastantes: roxo (purple-500) para destaques de fluxo principal, azul (blue-400) para processamento/workers, verde (green-500) para fluxos corretos ou sucesso, e vermelho/laranja para descartes ou falhas. Use fundos escuros (#0f0f0f ou #0e0e0e) e texto claro em todas as caixas. NUNCA utilize texto escuro em fundo escuro, ou cores berrantes que prejudiquem a harmonia com o fundo preto (#0a0a0a) do site.`;
+Critical rules:
+- REQUIRED LANGUAGE: All generated content must be written strictly in English.
+- The response MUST be valid JSON. Do not wrap it in Markdown code fences.
+- Do not use emojis anywhere.
+- Avoid shallow explanations. Go deep on transactions, concurrency, database states, error handling, or UI behavior when relevant to the diff.
+- QUIZ ANSWER DISTRIBUTION: Vary the correctOptionIndex across the 5 questions. Do not place the correct answer in the same position every time.
+- DIAGRAM COLORS AND ACCESSIBILITY: Diagrams must use a consistent dark theme. Prefer Tailwind-compatible colors such as purple for primary flow, blue for processing or workers, green for success, and red or orange for failure or discard paths. Use dark backgrounds (#0f0f0f or #0e0e0e) with light text throughout.`;
 
 const cappedDiff = diffContent.substring(0, 40000);
 
-const userPrompt = `Aqui está o título do Pull Request: "${prTitle}"
-Número do PR: ${prNumber}
+const userPrompt = `Here is the Pull Request title: "${prTitle}"
+PR number: ${prNumber}
 
-Aqui está o git diff do PR a ser analisado:
+Here is the git diff to analyze:
 \`\`\`diff
 ${cappedDiff}
 \`\`\``;
 
-console.log(`Iniciando requisição para o OpenRouter (${MODEL_NAME})...`);
+console.log(`Starting OpenRouter request (${MODEL_NAME})...`);
 
 async function callOpenRouter() {
   const mockResponsePath = process.env.OPENROUTER_MOCK_RESPONSE_PATH;
@@ -156,13 +156,13 @@ async function callOpenRouter() {
 
     if (!response.ok) {
       const errorText = await response.text();
-      throw new Error(`Erro na API do OpenRouter: Status ${response.status} - ${errorText}`);
+      throw new Error(`OpenRouter API error: status ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     if (!data || !data.choices || data.choices.length === 0 || !data.choices[0].message) {
-      console.error('Resposta inválida da API do OpenRouter:', JSON.stringify(data));
-      throw new Error('A API do OpenRouter retornou uma resposta sem choices ou malformada.');
+      console.error('Invalid OpenRouter API response:', JSON.stringify(data));
+      throw new Error('OpenRouter returned a malformed response or no choices.');
     }
 
     let contentText = data.choices[0].message.content.trim();
@@ -180,7 +180,7 @@ async function callOpenRouter() {
     try {
       explanation = JSON.parse(contentText);
     } catch (parseError) {
-      console.error('Erro ao analisar JSON retornado pelo OpenRouter. Conteúdo bruto:');
+      console.error('Failed to parse JSON returned by OpenRouter. Raw content:');
       console.error(contentText);
       throw parseError;
     }
@@ -188,7 +188,7 @@ async function callOpenRouter() {
     const usage = data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 };
     return { explanation, usage };
   } catch (error) {
-    console.error('Falha ao obter resposta estruturada do OpenRouter:', error);
+    console.error('Failed to obtain a structured response from OpenRouter:', error);
     process.exit(1);
   }
 }
@@ -196,9 +196,9 @@ async function callOpenRouter() {
 const { explanation, usage } = await callOpenRouter();
 
 console.log(
-  `Resposta da IA obtida com sucesso. (Prompt tokens: ${usage.prompt_tokens} | Completion tokens: ${usage.completion_tokens} | Total: ${usage.total_tokens})`
+  `AI response received successfully. (Prompt tokens: ${usage.prompt_tokens} | Completion tokens: ${usage.completion_tokens} | Total: ${usage.total_tokens})`
 );
-console.log('Formatando Quiz...');
+console.log('Formatting quiz...');
 
 let quizHtml = '';
 if (explanation.quiz && Array.isArray(explanation.quiz)) {
@@ -209,7 +209,7 @@ if (explanation.quiz && Array.isArray(explanation.quiz)) {
       typeof question.correctOptionIndex !== 'number' ||
       !Array.isArray(question.explanations)
     ) {
-      console.warn(`Questão do quiz inválida ou malformada no índice ${questionIndex}. Pulando.`);
+      console.warn(`Invalid or malformed quiz question at index ${questionIndex}. Skipping.`);
       return;
     }
 
@@ -223,11 +223,11 @@ if (explanation.quiz && Array.isArray(explanation.quiz)) {
                         onclick="selectOption(${questionIndex}, ${optionIndex}, ${isCorrect}, 'ex-q${questionIndex}-o${optionIndex}')"
                         class="option-btn text-left p-4 w-full rounded-lg border border-gray-800 bg-[#0f0f0f] hover:border-purple-500 text-sm font-sans flex items-center justify-between group">
                     <span>${option}</span>
-                    <span class="opacity-0 group-hover:opacity-100 transition-opacity text-purple-400 text-xs font-mono">Selecionar</span>
+                    <span class="opacity-0 group-hover:opacity-100 transition-opacity text-purple-400 text-xs font-mono">Select</span>
                 </button>
                 <div id="ex-q${questionIndex}-o${optionIndex}" class="explanation-box p-4 rounded-lg bg-gray-900/40 border border-gray-800 text-xs text-gray-400 space-y-1">
                     <p class="font-bold ${isCorrect ? 'text-green-400' : 'text-red-400'}">
-                        ${isCorrect ? '✓ Correto' : '✗ Incorreto'}
+                        ${isCorrect ? '✓ Correct' : '✗ Incorrect'}
                     </p>
                     <p>${question.explanations[optionIndex] || ''}</p>
                 </div>
@@ -238,10 +238,10 @@ if (explanation.quiz && Array.isArray(explanation.quiz)) {
         <div class="p-6 rounded-xl border border-gray-850 bg-[#0e0e0e]/20 space-y-4">
             <div class="flex items-start justify-between gap-4">
                 <h3 class="font-serif text-lg font-bold text-white leading-snug">
-                    <span class="font-mono text-purple-400 text-sm">Questão ${questionIndex + 1}.</span> ${question.question}
+                    <span class="font-mono text-purple-400 text-sm">Question ${questionIndex + 1}.</span> ${question.question}
                 </h3>
                 <button id="reset-q${questionIndex}" onclick="resetQuestion(${questionIndex})" class="text-xs text-gray-500 hover:text-purple-400 font-mono transition-colors hidden flex items-center gap-1 select-none pt-1">
-                    <span>Refazer</span>
+                    <span>Reset</span>
                     <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-2.5 h-2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                 </button>
             </div>
@@ -252,7 +252,7 @@ if (explanation.quiz && Array.isArray(explanation.quiz)) {
   });
 }
 
-const generationDate = new Date().toLocaleDateString('pt-BR', {
+const generationDate = new Date().toLocaleDateString('en-US', {
   year: 'numeric',
   month: 'long',
   day: 'numeric',
@@ -260,7 +260,7 @@ const generationDate = new Date().toLocaleDateString('pt-BR', {
   minute: '2-digit'
 });
 
-console.log('Injetando conteúdo no HTML do template...');
+console.log('Injecting content into the HTML template...');
 
 const inputCost = (usage.prompt_tokens / 1000000) * 0.089;
 const outputCost = (usage.completion_tokens / 1000000) * 0.18;
@@ -280,8 +280,8 @@ htmlTemplate = htmlTemplate
 
 try {
   writeFileSync(outputFilePath, htmlTemplate, 'utf8');
-  console.log(`\n✓ Sucesso! Explicação do PR gerada em: ${outputFilePath}`);
+  console.log(`\nSuccess. PR explanation generated at: ${outputFilePath}`);
 } catch (error) {
-  console.error('Falha ao gravar arquivo HTML de saída:', error);
+  console.error('Failed to write output HTML file:', error);
   process.exit(1);
 }

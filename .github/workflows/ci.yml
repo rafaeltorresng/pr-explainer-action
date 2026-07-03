@@ -29,10 +29,10 @@ jobs:
           EOF
 
           cat > event.json <<'EOF'
-          {"pull_request":{"title":"Teste de validacao","number":7}}
+          {"pull_request":{"title":"Validation test","number":7}}
           EOF
 
-          bun -e 'const fs=require("node:fs"); const payload={choices:[{message:{content:JSON.stringify({background:"<p>Contexto.</p>",intuition:"<p>Intuicao.</p>",diagrams:"<div>Diagrama.</div>",codeWalkthrough:"<pre>const x = 1;</pre>",quiz:[{question:"Q1?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]},{question:"Q2?",options:["A","B","C","D"],correctOptionIndex:2,explanations:["e0","e1","e2","e3"]},{question:"Q3?",options:["A","B","C","D"],correctOptionIndex:3,explanations:["e0","e1","e2","e3"]},{question:"Q4?",options:["A","B","C","D"],correctOptionIndex:0,explanations:["e0","e1","e2","e3"]},{question:"Q5?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]}]})}}],usage:{prompt_tokens:111,completion_tokens:222,total_tokens:333}}; fs.writeFileSync("mock.json", JSON.stringify(payload));'
+          bun -e 'const fs=require("node:fs"); const payload={choices:[{message:{content:JSON.stringify({background:"<p>Background.</p>",intuition:"<p>Intuition.</p>",diagrams:"<div>Diagram.</div>",codeWalkthrough:"<pre>const x = 1;</pre>",quiz:[{question:"Q1?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]},{question:"Q2?",options:["A","B","C","D"],correctOptionIndex:2,explanations:["e0","e1","e2","e3"]},{question:"Q3?",options:["A","B","C","D"],correctOptionIndex:3,explanations:["e0","e1","e2","e3"]},{question:"Q4?",options:["A","B","C","D"],correctOptionIndex:0,explanations:["e0","e1","e2","e3"]},{question:"Q5?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]}]})}}],usage:{prompt_tokens:111,completion_tokens:222,total_tokens:333}}; fs.writeFileSync("mock.json", JSON.stringify(payload));'
 
       - name: Render HTML
         shell: bash
@@ -49,6 +49,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -q 'Teste de validacao' output.html
-          grep -q 'Questão 1.' output.html
-          grep -q 'Contexto.' output.html
+          grep -q 'Validation test' output.html
+          grep -q 'Question 1.' output.html
+          grep -q 'Background.' output.html

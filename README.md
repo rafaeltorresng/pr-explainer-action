@@ -1,61 +1,61 @@
 # PR Explainer AI
 
-GitHub Action para gerar uma revisão interativa em HTML a partir do diff de um Pull Request.
+GitHub Action that generates an interactive HTML review from a Pull Request diff.
 
-O artefato final inclui:
+The final artifact includes:
 
-- contexto arquitetural
-- intuição da mudança
-- diagramas em HTML
-- walkthrough de código
-- quiz interativo com 5 perguntas
+- architectural background
+- change intuition
+- HTML diagrams
+- code walkthrough
+- interactive 5-question quiz
 
-## Decisão de Produto
+## Product Decision
 
-Esta action é **OpenRouter-only** no v1.
+This action is **OpenRouter-only** in v1.
 
-Motivos:
+Why:
 
-- uma única API key cobre muitos providers e modelos
-- o usuário pode trocar de modelo sem trocar de integração
-- a superfície da action fica pequena, clara e fácil de manter
-- você evita ramificações de código por vendor
+- one API key covers many providers and models
+- users can switch models without changing integrations
+- the action surface stays small, clear, and maintainable
+- you avoid vendor-specific branching inside the action
 
-O usuário continua livre para escolher o modelo via `openrouter_model`.
+Users still remain free to choose any model through `openrouter_model`.
 
-## Estratégia Recomendada de Modelo
+## Recommended Model Strategy
 
-Default recomendado:
+Recommended default:
 
 - `deepseek/deepseek-v4-flash`
 
-Exemplos de modelos fixos:
+Example fixed models:
 
 - `deepseek/deepseek-v4-flash`
 - `anthropic/claude-sonnet-4.5`
 - `openai/gpt-4.1`
 
-O padrão desta action é um modelo fixo para dar previsibilidade de comportamento.
-Se o usuário quiser, ele ainda pode sobrescrever com qualquer modelo aceito pela OpenRouter.
+This action uses a fixed default model to keep behavior predictable.
+If users want a different model, they can override it with any model supported by OpenRouter.
 
-## O Que a Action Faz
+## What the Action Does
 
-1. Faz checkout do diff entre a branch atual e a branch base do PR.
-2. Mede o total de linhas alteradas.
-3. Pula a geração quando o diff ultrapassa o limite configurado.
-4. Envia o diff para um modelo via OpenRouter.
-5. Renderiza um HTML standalone com o template local.
-6. Faz upload do HTML como artifact.
-7. Opcionalmente comenta no PR com o link da execução.
+1. Computes the diff between the current branch and the PR base branch.
+2. Measures the total changed lines.
+3. Skips generation when the diff exceeds the configured threshold.
+4. Sends the diff to a model through OpenRouter.
+5. Renders a standalone HTML file using the local template.
+6. Uploads the HTML as a workflow artifact.
+7. Optionally comments on the PR with the run link.
 
-## Requisitos
+## Requirements
 
-- O workflow chamador deve usar `actions/checkout@v4` com `fetch-depth: 0`.
-- O repositório deve ter um secret `OPENROUTER_API_KEY`.
-- Se você quer comentários no PR, conceda `pull-requests: write`.
-- O uso principal é em eventos `pull_request`.
+- The calling workflow should use `actions/checkout@v4` with `fetch-depth: 0`.
+- The repository must define an `OPENROUTER_API_KEY` secret.
+- If you want PR comments, grant `pull-requests: write`.
+- The primary target is `pull_request` workflows.
 
-## Uso Básico
+## Basic Usage
 
 ```yaml
 name: explain-pr
@@ -85,7 +85,7 @@ jobs:
           max_lines: '5000'
 ```
 
-## Uso Com Gatilho por Label
+## Label-Gated Usage
 
 ```yaml
 name: explain-pr
@@ -119,54 +119,54 @@ jobs:
 
 | Input | Required | Default | Description |
 | --- | --- | --- | --- |
-| `openrouter_api_key` | yes | - | Chave da OpenRouter. |
-| `max_lines` | no | `5000` | Máximo de linhas adicionadas + removidas antes de pular. |
-| `openrouter_model` | no | `deepseek/deepseek-v4-flash` | Modelo enviado para a OpenRouter. O usuário pode trocar por qualquer modelo suportado. |
-| `output_file` | no | `pr-explanation.html` | Nome do HTML gerado. |
-| `artifact_name` | no | `pr-explanation-html` | Nome do artifact enviado. |
-| `base_ref` | no | vazio | Override da branch base usada no `git diff`. |
-| `comment_on_pr` | no | `true` | Publica comentário no PR com instruções do artifact. |
+| `openrouter_api_key` | yes | - | OpenRouter API key. |
+| `max_lines` | no | `5000` | Maximum added + removed lines before skipping generation. |
+| `openrouter_model` | no | `deepseek/deepseek-v4-flash` | Model sent to OpenRouter. Users can override it with any supported model. |
+| `output_file` | no | `pr-explanation.html` | Output HTML filename. |
+| `artifact_name` | no | `pr-explanation-html` | Uploaded artifact name. |
+| `base_ref` | no | empty | Override for the base branch used in `git diff`. |
+| `comment_on_pr` | no | `true` | Posts a PR comment with artifact instructions. |
 
 ## Outputs
 
 | Output | Description |
 | --- | --- |
-| `should_run` | `true` quando a geração executa; `false` quando pula por tamanho. |
-| `lines_changed` | Total de linhas adicionadas + removidas no diff. |
-| `artifact_name` | Nome do artifact enviado. |
+| `should_run` | `true` when generation runs, `false` when skipped by size. |
+| `lines_changed` | Total added + removed lines in the diff. |
+| `artifact_name` | Uploaded artifact name. |
 
-## Segurança e Limitações
+## Security and Limitations
 
-- Em workflows disparados por **forks**, o GitHub não envia secrets ao runner, exceto `GITHUB_TOKEN`.
-- Se `OPENROUTER_API_KEY` não existir, a action falha.
-- Essa action é mais adequada para PRs internos e eventos confiáveis.
-- Se você considerar `pull_request_target`, trate checkout e execução com extremo cuidado.
+- In workflows triggered from **forks**, GitHub does not pass repository secrets to the runner except for `GITHUB_TOKEN`.
+- If `OPENROUTER_API_KEY` is missing, the action fails.
+- This action is best suited for internal PRs and trusted workflow events.
+- If you adopt `pull_request_target`, isolate checkout and execution carefully.
 
-## O Que Falta para Publicar no Marketplace
+## What Is Still Needed Before Marketplace Release
 
-Checklist objetivo:
+Checklist:
 
-- repositório público
-- `action.yml` único na raiz
-- nome da action disponível no Marketplace
-- README claro com uso e limitações
-- licença
-- tag inicial `v1.0.0`
-- tag móvel `v1`
-- termos do Marketplace aceitos na hora da publicação
+- public repository
+- a single `action.yml` at the repository root
+- an available action name on GitHub Marketplace
+- a clear README with usage and limits
+- license file
+- initial `v1.0.0` tag
+- moving `v1` tag
+- GitHub Marketplace terms accepted during publication
 
-## Estratégia de Release
+## Release Strategy
 
-Recomendado:
+Recommended:
 
-- tags imutáveis: `v1.0.0`, `v1.1.0`
-- tag maior móvel: `v1`
+- immutable tags: `v1.0.0`, `v1.1.0`
+- moving major tag: `v1`
 
 ## CI
 
-O workflow em `.github/workflows/ci.yml` valida o fluxo básico da action com uma resposta mockada da OpenRouter e garante que o HTML final é renderizado.
+The workflow in `.github/workflows/ci.yml` validates the basic action flow with a mocked OpenRouter response and confirms that the final HTML is rendered.
 
-## Arquivos do Repositório
+## Repository Files
 
 - `action.yml`
 - `README.md`
