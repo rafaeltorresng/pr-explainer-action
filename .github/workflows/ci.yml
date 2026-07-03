@@ -1,0 +1,54 @@
+name: validate-action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Generate fixtures
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > pr_diff.patch <<'EOF'
+          diff --git a/file.ts b/file.ts
+          --- a/file.ts
+          +++ b/file.ts
+          @@ -1 +1 @@
+          -const a = 1;
+          +const a = 2;
+          EOF
+
+          cat > event.json <<'EOF'
+          {"pull_request":{"title":"Teste de validacao","number":7}}
+          EOF
+
+          bun -e 'const fs=require("node:fs"); const payload={choices:[{message:{content:JSON.stringify({background:"<p>Contexto.</p>",intuition:"<p>Intuicao.</p>",diagrams:"<div>Diagrama.</div>",codeWalkthrough:"<pre>const x = 1;</pre>",quiz:[{question:"Q1?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]},{question:"Q2?",options:["A","B","C","D"],correctOptionIndex:2,explanations:["e0","e1","e2","e3"]},{question:"Q3?",options:["A","B","C","D"],correctOptionIndex:3,explanations:["e0","e1","e2","e3"]},{question:"Q4?",options:["A","B","C","D"],correctOptionIndex:0,explanations:["e0","e1","e2","e3"]},{question:"Q5?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]}]})}}],usage:{prompt_tokens:111,completion_tokens:222,total_tokens:333}}; fs.writeFileSync("mock.json", JSON.stringify(payload));'
+
+      - name: Render HTML
+        shell: bash
+        env:
+          OPENROUTER_API_KEY: test
+          OPENROUTER_MODEL: openrouter/auto
+          OPENROUTER_MOCK_RESPONSE_PATH: mock.json
+          GITHUB_EVENT_PATH: event.json
+        run: |
+          set -euo pipefail
+          bun explain-pr.js pr_diff.patch output.html
+
+      - name: Assert output
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'Teste de validacao' output.html
+          grep -q 'Questão 1.' output.html
+          grep -q 'Contexto.' output.html
