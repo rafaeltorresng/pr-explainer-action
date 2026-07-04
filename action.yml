@@ -114,13 +114,8 @@ runs:
           const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
           const body = [
             '### PR Explainer AI',
-            '',
-            'The interactive PR explanation was generated successfully.',
-            '',
-            `- Artifact: \`${artifactName}\``,
-            `- Run: ${runUrl}`,
-            '',
-            'Download the artifact, extract it, and open the generated HTML file in a browser.'
+            `Artifact: \`${artifactName}\``,
+            `[Open run](${runUrl})`
           ].join('\n');
 
           await github.rest.issues.createComment({
@@ -140,10 +135,7 @@ runs:
           const maxLines = '${{ inputs.max_lines }}';
           const body = [
             '### PR Explainer AI',
-            '',
-            `Generation skipped because this PR changed ${linesChanged} lines, above the configured limit of ${maxLines}.`,
-            '',
-            'Raise the limit if you want the explainer to analyze a larger patch.'
+            `Skipped: ${linesChanged} changed lines exceeds limit ${maxLines}.`
           ].join('\n');
 
           await github.rest.issues.createComment({
