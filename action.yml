@@ -69,7 +69,7 @@ runs:
           BASE_REF="main"
         fi
 
-        git fetch --no-tags --depth=1 origin "$BASE_REF"
+        git fetch --no-tags origin "$BASE_REF"
         git diff "origin/$BASE_REF"...HEAD > pr_diff.patch
 
         LINES_CHANGED="$(git diff --numstat "origin/$BASE_REF"...HEAD | awk '{if ($1 != "-") ins+=$1; if ($2 != "-") del+=$2} END {print ins+del}')"
