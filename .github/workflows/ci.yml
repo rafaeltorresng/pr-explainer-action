@@ -35,6 +35,12 @@ jobs:
           set -euo pipefail
           bun -e 'const fs=require("node:fs"); const payload={choices:[{message:{content:JSON.stringify({background:"<p>Background.</p>",intuition:"<p>Intuition.</p>",diagrams:"<div>Diagram.</div>",codeWalkthrough:"<pre>const x = 1;</pre>",quiz:[{question:"Q1?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]},{question:"Q2?",options:["A","B","C","D"],correctOptionIndex:2,explanations:["e0","e1","e2","e3"]},{question:"Q3?",options:["A","B","C","D"],correctOptionIndex:3,explanations:["e0","e1","e2","e3"]},{question:"Q4?",options:["A","B","C","D"],correctOptionIndex:0,explanations:["e0","e1","e2","e3"]},{question:"Q5?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]}]})}}],usage:{prompt_tokens:111,completion_tokens:222,total_tokens:333}}; fs.writeFileSync("mock.json", JSON.stringify(payload));'
 
+      - name: Run unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bun test
+
       - name: Run composite action
         uses: ./
         env:
@@ -42,6 +48,7 @@ jobs:
         with:
           openrouter_api_key: test
           openrouter_model: deepseek/deepseek-v4-flash
+          language: pt-BR
           output_file: composite-output.html
           artifact_name: composite-pr-explanation
           base_ref: main
@@ -52,5 +59,6 @@ jobs:
         run: |
           set -euo pipefail
           test -f composite-output.html
-          grep -q 'Question 1.' composite-output.html
+          grep -q 'Pergunta 1.' composite-output.html
+          grep -q 'Revisão Técnica Automatizada' composite-output.html
           grep -q 'Background.' composite-output.html

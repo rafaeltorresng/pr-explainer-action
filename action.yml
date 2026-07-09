@@ -17,6 +17,10 @@ inputs:
     description: 'OpenRouter model identifier. Users can override it with any model available in OpenRouter.'
     required: false
     default: 'deepseek/deepseek-v4-flash'
+  language:
+    description: 'Language used for the generated prompt, HTML artifact, and PR comments. Supported values: en, pt-BR.'
+    required: false
+    default: 'en'
   output_file:
     description: 'Generated HTML filename.'
     required: false
@@ -91,6 +95,7 @@ runs:
       env:
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         OPENROUTER_MODEL: ${{ inputs.openrouter_model }}
+        EXPLAINER_LANGUAGE: ${{ inputs.language }}
         OUTPUT_FILE: ${{ inputs.output_file }}
       run: |
         set -euo pipefail
@@ -111,15 +116,22 @@ runs:
         github-token: ${{ github.token }}
         script: |
           const artifactName = '${{ inputs.artifact_name }}';
+          const language = '${{ inputs.language }}';
           const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const body = [
-            '### PR Explainer AI',
-            '',
-            'Interactive explanation generated for this PR.',
-            '',
-            `Artifact: \`${artifactName}\``,
-            `[Open run](${runUrl})`
-          ].join('\n');
+          const copy = language === 'pt-BR'
+            ? {
+                title: '### PR Explainer AI',
+                generated: 'Explicação interativa gerada para este PR.',
+                artifact: `Artefato: \`${artifactName}\``,
+                openRun: `[Abrir execução](${runUrl})`
+              }
+            : {
+                title: '### PR Explainer AI',
+                generated: 'Interactive explanation generated for this PR.',
+                artifact: `Artifact: \`${artifactName}\``,
+                openRun: `[Open run](${runUrl})`
+              };
+          const body = [copy.title, '', copy.generated, '', copy.artifact, copy.openRun].join('\n');
 
           await github.rest.issues.createComment({
             owner: context.repo.owner,
@@ -134,12 +146,18 @@ runs:
       with:
         github-token: ${{ github.token }}
         script: |
+          const language = '${{ inputs.language }}';
           const linesChanged = '${{ steps.diff.outputs.lines_changed }}';
           const maxLines = '${{ inputs.max_lines }}';
-          const body = [
-            '### PR Explainer AI',
-            `Skipped: ${linesChanged} changed lines exceeds limit ${maxLines}.`
-          ].join('\n');
+          const body = language === 'pt-BR'
+            ? [
+                '### PR Explainer AI',
+                `Ignorado: ${linesChanged} linhas alteradas excedem o limite ${maxLines}.`
+              ].join('\n')
+            : [
+                '### PR Explainer AI',
+                `Skipped: ${linesChanged} changed lines exceeds limit ${maxLines}.`
+              ].join('\n');
 
           await github.rest.issues.createComment({
             owner: context.repo.owner,

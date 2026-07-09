@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="pt-BR" class="dark">
 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PR Explanation #{{PR_NUMBER}} — {{PR_TITLE}}</title>
+    <title>Explicação do PR #{{PR_NUMBER}} — {{PR_TITLE}}</title>
 
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -31,7 +31,7 @@
         }
     </script>
 
-    <!-- Custom template styles -->
+    <!-- Estilos customizados do template -->
     <style>
         :root {
             --accent-color: #a855f7; /* Default purple accent */
@@ -268,11 +268,11 @@
 
                         <!-- Table of contents -->
                         <nav class="space-y-3">
-                            <a href="#background" id="link-background" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">1. Background</a>
-                            <a href="#intuition" id="link-intuition" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">2. Intuition</a>
-                            <a href="#diagrams" id="link-diagrams" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">3. Diagrams</a>
-                            <a href="#code-walkthrough" id="link-code-walkthrough" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">4. Code</a>
-                            <a href="#quiz" id="link-quiz" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">5. PR Quiz</a>
+                            <a href="#background" id="link-background" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">1. Contexto</a>
+                            <a href="#intuition" id="link-intuition" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">2. Intuição</a>
+                            <a href="#diagrams" id="link-diagrams" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">3. Diagramas</a>
+                            <a href="#code-walkthrough" id="link-code-walkthrough" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">4. Código</a>
+                            <a href="#quiz" id="link-quiz" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">5. Quiz do PR</a>
                         </nav>
                     </div>
 
@@ -280,10 +280,10 @@
                     <div class="space-y-8 mt-auto pt-8">
                         <!-- Quiz progress card -->
                         <div id="quiz-progress-box" class="p-4 rounded-xl border border-gray-800 bg-[#0e0e0e]/50 space-y-2 hidden">
-                            <h4 class="text-xs font-mono uppercase text-gray-400 tracking-wider">Quiz Score</h4>
+                            <h4 class="text-xs font-mono uppercase text-gray-400 tracking-wider">Pontuação do Quiz</h4>
                             <div class="flex items-baseline gap-1">
                                 <span id="quiz-score" class="text-2xl font-bold font-mono text-purple-400">0</span>
-                                <span class="text-sm text-gray-500 font-mono">/ 5 correct</span>
+                                <span class="text-sm text-gray-500 font-mono">/ 5 corretas</span>
                             </div>
                             <div class="w-full bg-gray-800 rounded-full h-1 overflow-hidden">
                                 <div id="quiz-progress-bar" class="bg-purple-500 h-1 rounded-full transition-all duration-300" style="width: 0%"></div>
@@ -293,8 +293,8 @@
                         <!-- Mascot at the computer -->
                         <div class="flex justify-center">
                             <div class="mascot-wrapper">
-                                <div id="mascot-sprite" class="mascot-sprite" aria-label="Mascot at the computer">
-                                    <img id="mascot-img" src="" alt="Mascot at the computer with code">
+                                <div id="mascot-sprite" class="mascot-sprite" aria-label="Mascote no computador">
+                                    <img id="mascot-img" src="" alt="Mascote no computador com código">
                                 </div>
                             </div>
                         </div>
@@ -308,13 +308,13 @@
                 <!-- PR header -->
                 <div class="px-6 sm:px-12 lg:px-20 py-10 border-b border-gray-900 bg-[#0c0c0c]/35 backdrop-blur-md">
                     <div class="max-w-4xl space-y-4">
-                        <span class="text-purple-400 font-mono text-sm uppercase tracking-[0.24em]">Technical Review</span>
+                        <span class="text-purple-400 font-mono text-sm uppercase tracking-[0.24em]">Revisão Técnica Automatizada</span>
                         <h1 class="text-4xl sm:text-5xl font-serif text-white font-bold leading-tight">{{PR_TITLE}}</h1>
-                        <p class="header-summary font-sans">A clear read of this PR's changes.</p>
+                        <p class="header-summary font-sans">Uma leitura clara das mudanças deste PR.</p>
                         <div class="flex flex-wrap items-center gap-2 text-sm text-gray-500 font-mono">
-                            <span class="meta-chip">Generated on {{GENERATION_DATE}}</span>
-                            <span class="meta-chip">Cost: ${{TOTAL_PRICE}}</span>
-                            <span class="meta-chip">Input / Output: $0.089 / $0.18 per 1M</span>
+                            <span class="meta-chip">Gerado em {{GENERATION_DATE}}</span>
+                            <span class="meta-chip">Custo: ${{TOTAL_PRICE}}</span>
+                            <span class="meta-chip">Entrada / saída: $0.089 / $0.18 por 1M</span>
                         </div>
                     </div>
                 </div>
@@ -324,7 +324,7 @@
                     
                     <!-- BACKGROUND -->
                     <section id="background" class="scroll-mt-24 space-y-5">
-                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">1. Background</h2>
+                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">1. Contexto</h2>
                         <div class="reading-body font-sans space-y-5">
                             {{BACKGROUND_CONTENT}}
                         </div>
@@ -332,7 +332,7 @@
 
                     <!-- INTUITION -->
                     <section id="intuition" class="scroll-mt-24 space-y-5">
-                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">2. Intuition</h2>
+                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">2. Intuição</h2>
                         <div class="reading-body font-sans space-y-5">
                             {{INTUITION_CONTENT}}
                         </div>
@@ -340,7 +340,7 @@
 
                     <!-- DIAGRAMS -->
                     <section id="diagrams" class="scroll-mt-24 space-y-5">
-                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">3. Flow Diagrams</h2>
+                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">3. Diagramas de Fluxo</h2>
                         <div class="reading-body p-6 rounded-xl border border-gray-850 bg-[#0c0c0c] font-sans space-y-6">
                             {{DIAGRAMS_CONTENT}}
                         </div>
@@ -348,7 +348,7 @@
 
                     <!-- CODE WALKTHROUGH -->
                     <section id="code-walkthrough" class="scroll-mt-24 space-y-5">
-                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">4. Code Walkthrough</h2>
+                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">4. Walkthrough do Código</h2>
                         <div class="reading-body font-sans space-y-6">
                             {{CODE_CONTENT}}
                         </div>
@@ -356,9 +356,9 @@
 
                     <!-- INTERACTIVE QUIZ -->
                     <section id="quiz" class="scroll-mt-24 space-y-6">
-                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">5. Test Your Understanding</h2>
+                        <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">5. Teste seu Entendimento</h2>
                         <p class="section-intro font-sans text-gray-500">
-                            Answer these 5 interactive multiple-choice questions to confirm that you captured the core ideas of this PR.
+                            Responda a estas 5 perguntas interativas de múltipla escolha para confirmar que você capturou as ideias centrais deste PR.
                         </p>
                         <div class="space-y-8 font-sans text-lg">
                             {{QUIZ_CONTENT}}

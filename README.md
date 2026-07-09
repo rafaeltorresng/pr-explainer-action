@@ -9,6 +9,7 @@ The final artifact includes:
 - HTML diagrams
 - code walkthrough
 - interactive 5-question quiz
+- binary language selection: English or Portuguese (Brazil)
 
 ## Product Decision
 
@@ -32,7 +33,7 @@ Recommended default:
 Example fixed models:
 
 - `deepseek/deepseek-v4-flash`
-- `anthropic/claude-sonnet-4.5`
+- `anthropic/claude-sonnet-5`
 - `openai/gpt-4.1`
 
 This action uses a fixed default model to keep behavior predictable.
@@ -45,8 +46,9 @@ If users want a different model, they can override it with any model supported b
 3. Skips generation when the diff exceeds the configured threshold.
 4. Sends the diff to a model through OpenRouter.
 5. Renders a standalone HTML file using the local template.
-6. Uploads the HTML as a workflow artifact.
-7. Optionally comments on the PR with the run link.
+6. Randomizes quiz answer placement in the final artifact to avoid positional bias.
+7. Uploads the HTML as a workflow artifact.
+8. Optionally comments on the PR with the run link.
 
 ## Requirements
 
@@ -82,6 +84,7 @@ jobs:
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
           openrouter_model: deepseek/deepseek-v4-flash
+          language: en
           max_lines: '5000'
 ```
 
@@ -113,7 +116,18 @@ jobs:
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
           openrouter_model: deepseek/deepseek-v4-flash
+          language: pt-BR
 ```
+
+## Language Selection
+
+Supported values:
+
+- `en`
+- `pt-BR`
+
+The action chooses exactly one prompt and one HTML template at runtime.
+There is no bilingual prompt composition, so selecting Portuguese does not add extra prompt tokens for English instructions.
 
 ## Inputs
 
@@ -122,6 +136,7 @@ jobs:
 | `openrouter_api_key` | yes | - | OpenRouter API key. |
 | `max_lines` | no | `5000` | Maximum added + removed lines before skipping generation. |
 | `openrouter_model` | no | `deepseek/deepseek-v4-flash` | Model sent to OpenRouter. Users can override it with any supported model. |
+| `language` | no | `en` | Output language for prompt, HTML artifact, and PR comments. Supported values: `en`, `pt-BR`. |
 | `output_file` | no | `pr-explanation.html` | Output HTML filename. |
 | `artifact_name` | no | `pr-explanation-html` | Uploaded artifact name. |
 | `base_ref` | no | empty | Override for the base branch used in `git diff`. |
