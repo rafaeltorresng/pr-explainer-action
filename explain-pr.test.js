@@ -5,6 +5,7 @@ const { describe, expect, test } = require('bun:test');
 
 const {
   DEFAULT_MODEL_NAME,
+  FETCH_TIMEOUT_MS,
   generateExplanation,
   getPrompt,
   normalizeLanguage,
@@ -178,4 +179,43 @@ describe('template injection safety', () => {
     const html = readFileSync(outputFilePath, 'utf8');
     expect(html).toContain('$&amp; per unit, $1 extra');
   });
+});
+describe('fetch timeout', () => {
+  test('FETCH_TIMEOUT_MS is set to 5 minutes', () => {
+    expect(FETCH_TIMEOUT_MS).toBe(5 * 60 * 1000);
+  });
+
+  test('AbortError from fetch is converted to a readable timeout message', async () => {
+    // Mocka fetch para lançar AbortError imediatamente
+    const originalFetch = globalThis.fetch;
+    // Mocka setTimeout/clearTimeout para que o sleep do retry não bloqueie o teste
+    const originalSetTimeout = globalThis.setTimeout;
+    const originalClearTimeout = globalThis.clearTimeout;
+    globalThis.setTimeout = (fn) => { fn(); return 0; };
+    globalThis.clearTimeout = () => {};
+
+    globalThis.fetch = async () => {
+      const err = new Error('The operation was aborted.');
+      err.name = 'AbortError';
+      throw err;
+    };
+
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+
+    try {
+      await expect(
+        generateExplanation({
+          diffFilePath: join(process.cwd(), 'sample.patch'),
+          outputFilePath: join(tempDir, 'out.html'),
+          languageInput: 'en',
+          apiKey: 'test-key'
+        })
+      ).rejects.toThrow(/timed out/i);
+    } finally {
+      globalThis.fetch = originalFetch;
+      globalThis.setTimeout = originalSetTimeout;
+      globalThis.clearTimeout = originalClearTimeout;
+    }
+  }, 15000);
 });

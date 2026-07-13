@@ -422,6 +422,7 @@ function validateExplanation(explanation) {
 
 const MAX_RETRIES = 2; // Total de tentativas = 1 inicial + 2 retries
 const RETRY_BASE_DELAY_MS = 2000;
+const FETCH_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutos por tentativa
 
 async function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -455,24 +456,38 @@ async function callOpenRouter({
     }
 
     try {
-      const response = await fetch(`${apiBaseUrl}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'HTTP-Referer': 'https://github.com/SantanaInteligencia/app',
-          'X-Title': 'SIP PR Explainer'
-        },
-        body: JSON.stringify({
-          model: modelName,
-          messages: [
-            { role: 'system', content: systemInstruction },
-            { role: 'user', content: userPrompt }
-          ],
-          temperature: 0.1,
-          response_format: { type: 'json_object' }
-        })
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+      let response;
+      try {
+        response = await fetch(`${apiBaseUrl}/chat/completions`, {
+          signal: controller.signal,
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+            'HTTP-Referer': 'https://github.com/SantanaInteligencia/app',
+            'X-Title': 'SIP PR Explainer'
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: [
+              { role: 'system', content: systemInstruction },
+              { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.1,
+            response_format: { type: 'json_object' }
+          })
+        });
+      } catch (fetchError) {
+        if (fetchError.name === 'AbortError') {
+          throw new Error(`OpenRouter request timed out after ${FETCH_TIMEOUT_MS / 1000}s.`);
+        }
+        throw fetchError;
+      } finally {
+        clearTimeout(timeoutId);
+      }
 
       if (!response.ok) {
         const errorText = await response.text();
@@ -624,6 +639,7 @@ if (require.main === module) {
 module.exports = {
   DEFAULT_LANGUAGE,
   DEFAULT_MODEL_NAME,
+  FETCH_TIMEOUT_MS,
   LANGUAGE_CONFIG,
   buildTargetCorrectIndexes,
   generateExplanation,
