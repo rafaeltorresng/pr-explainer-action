@@ -243,3 +243,72 @@ describe('fetch timeout', () => {
     }
   }, 15000);
 });
+
+describe('quiz edge cases', () => {
+  test('quiz with 0 valid questions does not crash — warns and produces empty quiz section', async () => {
+    const { writeFileSync: fsWrite } = require('node:fs');
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    const outputFilePath = join(tempDir, 'empty-quiz-output.html');
+    const mockPath = join(tempDir, 'mock-empty-quiz.json');
+
+    // Todas as questões têm estrutura inválida (falta correctOptionIndex)
+    const content = JSON.stringify({
+      background: '<p>bg</p>',
+      intuition: '<p>int</p>',
+      diagrams: '<div>d</div>',
+      codeWalkthrough: '<pre>c</pre>',
+      quiz: [
+        { question: 'Q?', options: ['A', 'B'], correctOptionIndex: 0, explanations: ['e'] }, // options.length !== 4
+        { question: 'Q2?', options: ['A', 'B', 'C', 'D'], correctOptionIndex: 9, explanations: ['e','e','e','e'] } // index out of range
+      ]
+    });
+
+    fsWrite(mockPath, JSON.stringify({
+      choices: [{ message: { content } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+    }));
+
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+
+    // Não deve lançar — quiz vazio é um warning, não um erro fatal
+    await expect(generateExplanation({
+      diffFilePath: join(process.cwd(), 'sample.patch'),
+      outputFilePath,
+      languageInput: 'pt-BR',
+      apiKey: 'test',
+      mockResponsePath: mockPath
+    })).resolves.toBeDefined();
+
+    expect(existsSync(outputFilePath)).toBe(true);
+  });
+
+  test('quiz with empty array from LLM does not crash', async () => {
+    const { writeFileSync: fsWrite } = require('node:fs');
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    const outputFilePath = join(tempDir, 'no-quiz-output.html');
+    const mockPath = join(tempDir, 'mock-no-quiz.json');
+
+    const content = JSON.stringify({
+      background: '<p>bg</p>',
+      intuition: '<p>int</p>',
+      diagrams: '<div>d</div>',
+      codeWalkthrough: '<pre>c</pre>',
+      quiz: []
+    });
+
+    fsWrite(mockPath, JSON.stringify({
+      choices: [{ message: { content } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+    }));
+
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+
+    await expect(generateExplanation({
+      diffFilePath: join(process.cwd(), 'sample.patch'),
+      outputFilePath,
+      languageInput: 'pt-BR',
+      apiKey: 'test',
+      mockResponsePath: mockPath
+    })).resolves.toBeDefined();
+  });
+});

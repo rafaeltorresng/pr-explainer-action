@@ -570,6 +570,15 @@ async function generateExplanation({
   console.log('Formatting quiz...');
 
   const normalizedQuiz = normalizeQuiz(explanation.quiz, `${prNumber}:${prTitle}:${language}`);
+
+  if (normalizedQuiz.length === 0) {
+    console.warn(
+      'Quiz returned 0 valid questions after normalization. ' +
+      `Raw quiz had ${Array.isArray(explanation.quiz) ? explanation.quiz.length : 'no'} entries. ` +
+      'The quiz section will be empty in the output.'
+    );
+  }
+
   const quizHtml = renderQuizHtml(normalizedQuiz, language);
   const generationDate = getGenerationDate(language);
 
