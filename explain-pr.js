@@ -316,20 +316,115 @@ function renderQuizHtml(quiz, language) {
   return quizHtml;
 }
 
+function stripMarkdownFences(text) {
+  let result = text;
+
+  if (result.startsWith('```json')) {
+    result = result.substring(7);
+  } else if (result.startsWith('```')) {
+    result = result.substring(3);
+  }
+
+  if (result.endsWith('```')) {
+    result = result.substring(0, result.length - 3);
+  }
+
+  return result.trim();
+}
+
+/**
+ * Tenta reparar um JSON truncado fechando chaves/colchetes/strings abertas.
+ * Estratégia conservadora: se não encontrar um '{' inicial, retorna null.
+ * Se o repair também falhar no parse, retorna null.
+ */
+function repairTruncatedJson(text) {
+  const start = text.indexOf('{');
+  if (start === -1) return null;
+
+  let json = text.substring(start);
+
+  // Fechar string aberta se necessário (paridade de aspas na última linha)
+  const lastNewline = json.lastIndexOf('\n');
+  const lastLine = lastNewline === -1 ? json : json.substring(lastNewline);
+  const quoteCount = (lastLine.match(/(?<!\\)"/g) || []).length;
+  if (quoteCount % 2 !== 0) {
+    json += '"';
+  }
+
+  // Contar chaves e colchetes abertos e fechá-los
+  const stack = [];
+  let inString = false;
+  let escape = false;
+
+  for (const char of json) {
+    if (escape) { escape = false; continue; }
+    if (char === '\\' && inString) { escape = true; continue; }
+    if (char === '"') { inString = !inString; continue; }
+    if (inString) continue;
+    if (char === '{' || char === '[') stack.push(char);
+    else if (char === '}' || char === ']') stack.pop();
+  }
+
+  // Fechar em ordem reversa
+  while (stack.length > 0) {
+    const open = stack.pop();
+    json += open === '{' ? '}' : ']';
+  }
+
+  try {
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 function parseModelContent(rawContent) {
-  let contentText = String(rawContent || '').trim();
+  const contentText = stripMarkdownFences(String(rawContent || ''));
 
-  if (contentText.startsWith('```json')) {
-    contentText = contentText.substring(7);
-  } else if (contentText.startsWith('```')) {
-    contentText = contentText.substring(3);
+  // Tentativa 1: parse direto
+  try {
+    return JSON.parse(contentText);
+  } catch (firstError) {
+    console.warn(`JSON parse direto falhou: ${firstError.message}. Tentando repair...`);
+    console.warn(`Raw response (primeiros 500 chars): ${contentText.substring(0, 500)}`);
   }
 
-  if (contentText.endsWith('```')) {
-    contentText = contentText.substring(0, contentText.length - 3);
+  // Tentativa 2: repair de truncamento
+  const repaired = repairTruncatedJson(contentText);
+  if (repaired !== null) {
+    console.warn('JSON repair bem-sucedido, mas resposta estava truncada. Será tratado como falha para retry.');
+    // Intencionalmente lançamos erro mesmo com repair: conteúdo parcial não é aceitável
+    throw new Error('JSON estava truncado — repair possível mas conteúdo parcial rejeitado para garantir qualidade.');
   }
 
-  return JSON.parse(contentText.trim());
+  throw new Error('Failed to parse JSON — resposta da LLM é inválida e não reparável.');
+}
+
+/**
+ * Valida que os campos essenciais do explanation não estão todos vazios.
+ * Campos vazios indicam que o modelo retornou JSON válido mas sem conteúdo útil.
+ */
+function validateExplanation(explanation) {
+  const essentialFields = ['background', 'intuition', 'diagrams', 'codeWalkthrough'];
+  const nonEmptyFields = essentialFields.filter(
+    (field) => explanation[field] && String(explanation[field]).trim().length > 0
+  );
+
+  if (nonEmptyFields.length === 0) {
+    throw new Error('Explanation retornada pela LLM tem todos os campos essenciais vazios.');
+  }
+
+  const emptyFields = essentialFields.filter((f) => !nonEmptyFields.includes(f));
+  if (emptyFields.length > 0) {
+    console.warn(`Campos vazios na explanation: ${emptyFields.join(', ')}. Continuando com conteúdo parcial.`);
+  }
+}
+
+const MAX_RETRIES = 2; // Total de tentativas = 1 inicial + 2 retries
+const RETRY_BASE_DELAY_MS = 2000;
+
+async function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function callOpenRouter({
@@ -342,46 +437,76 @@ async function callOpenRouter({
 }) {
   if (mockResponsePath) {
     const mockData = JSON.parse(readFileSync(mockResponsePath, 'utf8'));
+    const explanation = parseModelContent(mockData.choices[0].message.content);
+    validateExplanation(explanation);
     return {
-      explanation: parseModelContent(mockData.choices[0].message.content),
+      explanation,
       usage: mockData.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
     };
   }
 
-  const response = await fetch(`${apiBaseUrl}/chat/completions`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://github.com/SantanaInteligencia/app',
-      'X-Title': 'SIP PR Explainer'
-    },
-    body: JSON.stringify({
-      model: modelName,
-      messages: [
-        { role: 'system', content: systemInstruction },
-        { role: 'user', content: userPrompt }
-      ],
-      temperature: 0.1,
-      response_format: { type: 'json_object' }
-    })
-  });
+  let lastError;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter API error: status ${response.status} - ${errorText}`);
+  for (let attempt = 1; attempt <= MAX_RETRIES + 1; attempt++) {
+    if (attempt > 1) {
+      const delayMs = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 2); // 2s, 4s
+      console.warn(`Tentativa ${attempt}/${MAX_RETRIES + 1} após ${delayMs}ms...`);
+      await sleep(delayMs);
+    }
+
+    try {
+      const response = await fetch(`${apiBaseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': 'https://github.com/SantanaInteligencia/app',
+          'X-Title': 'SIP PR Explainer'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            { role: 'system', content: systemInstruction },
+            { role: 'user', content: userPrompt }
+          ],
+          temperature: 0.1,
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`OpenRouter API error: status ${response.status} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      if (!data || !data.choices || data.choices.length === 0 || !data.choices[0].message) {
+        console.error('Invalid OpenRouter API response:', JSON.stringify(data));
+        throw new Error('OpenRouter returned a malformed response or no choices.');
+      }
+
+      const explanation = parseModelContent(data.choices[0].message.content);
+      validateExplanation(explanation);
+
+      if (attempt > 1) {
+        console.log(`Sucesso na tentativa ${attempt}.`);
+      }
+
+      return {
+        explanation,
+        usage: data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
+      };
+    } catch (error) {
+      lastError = error;
+      console.warn(`Tentativa ${attempt} falhou: ${error.message}`);
+
+      if (attempt === MAX_RETRIES + 1) {
+        console.error(`Todas as ${MAX_RETRIES + 1} tentativas falharam.`);
+      }
+    }
   }
 
-  const data = await response.json();
-  if (!data || !data.choices || data.choices.length === 0 || !data.choices[0].message) {
-    console.error('Invalid OpenRouter API response:', JSON.stringify(data));
-    throw new Error('OpenRouter returned a malformed response or no choices.');
-  }
-
-  return {
-    explanation: parseModelContent(data.choices[0].message.content),
-    usage: data.usage || { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 }
-  };
+  throw lastError;
 }
 
 async function generateExplanation({
@@ -498,5 +623,7 @@ module.exports = {
   getPrompt,
   normalizeLanguage,
   normalizeQuiz,
-  renderQuizHtml
+  parseModelContent,
+  renderQuizHtml,
+  validateExplanation
 };

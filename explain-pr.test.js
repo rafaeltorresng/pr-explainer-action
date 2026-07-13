@@ -8,7 +8,9 @@ const {
   generateExplanation,
   getPrompt,
   normalizeLanguage,
-  normalizeQuiz
+  normalizeQuiz,
+  parseModelContent,
+  validateExplanation
 } = require('./explain-pr.js');
 
 describe('language configuration', () => {
@@ -79,5 +81,37 @@ describe('artifact rendering', () => {
     expect(html).toContain('Teste seu Entendimento');
     expect(html).toContain('Pergunta 1.');
     expect(html).toContain('Selecionar');
+  });
+});
+
+describe('json resilience', () => {
+  test('parseModelContent strips markdown fences before parsing', () => {
+    const withFence = '```json\n{"background":"ok","intuition":"x","diagrams":"d","codeWalkthrough":"c","quiz":[]}\n```';
+    const result = parseModelContent(withFence);
+    expect(result.background).toBe('ok');
+  });
+
+  test('parseModelContent rejects truncated JSON (option A: always retry)', () => {
+    // JSON truncado — chave "codeWalkthrough" cortada no meio
+    const truncated = '{"background":"<p>bg</p>","intuition":"<p>int</p>","diagrams":"<div>d</div>","codeWalkthrough":"<pre>co';
+    expect(() => parseModelContent(truncated)).toThrow(/truncado|parse/i);
+  });
+
+  test('parseModelContent throws on completely invalid JSON', () => {
+    expect(() => parseModelContent('not json at all')).toThrow();
+    expect(() => parseModelContent('')).toThrow();
+  });
+
+  test('validateExplanation throws when all essential fields are empty', () => {
+    expect(() => validateExplanation({ background: '', intuition: '   ', diagrams: '', codeWalkthrough: '' })).toThrow(
+      /campos essenciais vazios/i
+    );
+  });
+
+  test('validateExplanation passes with at least one non-empty essential field', () => {
+    // Não deve lançar — mesmo com outros campos vazios
+    expect(() =>
+      validateExplanation({ background: '<p>something</p>', intuition: '', diagrams: '', codeWalkthrough: '' })
+    ).not.toThrow();
   });
 });
