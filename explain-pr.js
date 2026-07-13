@@ -565,16 +565,23 @@ async function generateExplanation({
   const totalCost = inputCost + outputCost;
   const formattedPrice = totalCost.toFixed(6);
 
+  const background = explanation.background || '';
+  const intuition = explanation.intuition || '';
+  const diagrams = explanation.diagrams || '';
+  const codeWalkthrough = explanation.codeWalkthrough || '';
+
+  // Use replacer functions to prevent String.replace() from interpreting
+  // special patterns like $&, $1, $$ in the replacement value.
   htmlTemplate = htmlTemplate
-    .replace(/{{PR_NUMBER}}/g, prNumber)
-    .replace(/{{PR_TITLE}}/g, prTitle)
-    .replace(/{{GENERATION_DATE}}/g, generationDate)
-    .replace(/{{TOTAL_PRICE}}/g, formattedPrice)
-    .replace(/{{BACKGROUND_CONTENT}}/g, explanation.background || '')
-    .replace(/{{INTUITION_CONTENT}}/g, explanation.intuition || '')
-    .replace(/{{DIAGRAMS_CONTENT}}/g, explanation.diagrams || '')
-    .replace(/{{CODE_CONTENT}}/g, explanation.codeWalkthrough || '')
-    .replace(/{{QUIZ_CONTENT}}/g, quizHtml);
+    .replace(/{{PR_NUMBER}}/g, () => prNumber)
+    .replace(/{{PR_TITLE}}/g, () => prTitle)
+    .replace(/{{GENERATION_DATE}}/g, () => generationDate)
+    .replace(/{{TOTAL_PRICE}}/g, () => formattedPrice)
+    .replace(/{{BACKGROUND_CONTENT}}/g, () => background)
+    .replace(/{{INTUITION_CONTENT}}/g, () => intuition)
+    .replace(/{{DIAGRAMS_CONTENT}}/g, () => diagrams)
+    .replace(/{{CODE_CONTENT}}/g, () => codeWalkthrough)
+    .replace(/{{QUIZ_CONTENT}}/g, () => quizHtml);
 
   writeFileSync(outputFilePath, htmlTemplate, 'utf8');
   console.log(`\nSuccess. PR explanation generated at: ${outputFilePath}`);

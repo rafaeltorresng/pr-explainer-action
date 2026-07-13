@@ -115,3 +115,67 @@ describe('json resilience', () => {
     ).not.toThrow();
   });
 });
+
+describe('template injection safety', () => {
+  test('PR title with $ special chars does not corrupt the template output', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    const outputFilePath = join(tempDir, 'dollar-output.html');
+
+    // Títulos com $& e $$ são os padrões mais perigosos do String.replace()
+    // sem o fix, $& seria substituído pelo match completo e $$ por um $ literal
+    process.env.PR_TITLE = 'fix: handle $& edge case with $$discount';
+    process.env.PR_NUMBER = '42';
+    process.env.GITHUB_EVENT_PATH = '';
+
+    await generateExplanation({
+      diffFilePath: join(process.cwd(), 'sample.patch'),
+      outputFilePath,
+      languageInput: 'pt-BR',
+      apiKey: 'test',
+      mockResponsePath: join(process.cwd(), 'mock.json')
+    });
+
+    const html = readFileSync(outputFilePath, 'utf8');
+    // O título LITERAL deve estar no HTML — não o placeholder {{PR_TITLE}} expandido erroneamente
+    // Se o fix não existisse, $& viraria o match (e.g. "{{PR_TITLE}}") e $$ viraria "$"
+    expect(html).toContain('fix: handle $& edge case with $$discount');
+    expect(html).not.toContain('{{PR_TITLE}}');
+
+    delete process.env.PR_TITLE;
+    delete process.env.PR_NUMBER;
+  });
+
+  test('LLM content with $ chars does not corrupt the template output', async () => {
+    const { writeFileSync: fsWrite } = require('node:fs');
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    const outputFilePath = join(tempDir, 'dollar-llm-output.html');
+    const mockPath = join(tempDir, 'mock-dollar.json');
+
+    // Conteúdo da LLM contendo $& — o padrão mais perigoso
+    const content = JSON.stringify({
+      background: '<p>Cost is $&amp; per unit, $1 extra</p>',
+      intuition: '<p>Normal</p>',
+      diagrams: '<div>ok</div>',
+      codeWalkthrough: '<pre>const x = 1;</pre>',
+      quiz: []
+    });
+
+    fsWrite(mockPath, JSON.stringify({
+      choices: [{ message: { content } }],
+      usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 }
+    }));
+
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+
+    await generateExplanation({
+      diffFilePath: join(process.cwd(), 'sample.patch'),
+      outputFilePath,
+      languageInput: 'pt-BR',
+      apiKey: 'test',
+      mockResponsePath: mockPath
+    });
+
+    const html = readFileSync(outputFilePath, 'utf8');
+    expect(html).toContain('$&amp; per unit, $1 extra');
+  });
+});
