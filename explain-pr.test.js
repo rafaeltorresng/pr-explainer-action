@@ -137,10 +137,34 @@ describe('template injection safety', () => {
     });
 
     const html = readFileSync(outputFilePath, 'utf8');
-    // O título LITERAL deve estar no HTML — não o placeholder {{PR_TITLE}} expandido erroneamente
-    // Se o fix não existisse, $& viraria o match (e.g. "{{PR_TITLE}}") e $$ viraria "$"
-    expect(html).toContain('fix: handle $& edge case with $$discount');
+    // Com escapeHtml + replacer function: $& vira $&amp; no HTML (sem corrupção de template)
+    expect(html).toContain('fix: handle $&amp; edge case with $$discount');
     expect(html).not.toContain('{{PR_TITLE}}');
+
+    delete process.env.PR_TITLE;
+    delete process.env.PR_NUMBER;
+  });
+
+  test('PR title with HTML special chars is escaped to prevent layout breakage', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    const outputFilePath = join(tempDir, 'html-escape-output.html');
+
+    process.env.PR_TITLE = 'feat: <script>alert(1)</script> & "quotes"';
+    process.env.PR_NUMBER = '99';
+    process.env.GITHUB_EVENT_PATH = '';
+
+    await generateExplanation({
+      diffFilePath: join(process.cwd(), 'sample.patch'),
+      outputFilePath,
+      languageInput: 'pt-BR',
+      apiKey: 'test',
+      mockResponsePath: join(process.cwd(), 'mock.json')
+    });
+
+    const html = readFileSync(outputFilePath, 'utf8');
+    // Deve conter a versão escaped — nunca a tag <script> crua
+    expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;quotes&quot;');
+    expect(html).not.toContain('<script>alert(1)</script>');
 
     delete process.env.PR_TITLE;
     delete process.env.PR_NUMBER;

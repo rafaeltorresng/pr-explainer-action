@@ -587,9 +587,11 @@ async function generateExplanation({
 
   // Use replacer functions to prevent String.replace() from interpreting
   // special patterns like $&, $1, $$ in the replacement value.
+  // prTitle is HTML-escaped to prevent layout breakage or XSS from titles
+  // containing <, >, &, or quotes.
   htmlTemplate = htmlTemplate
     .replace(/{{PR_NUMBER}}/g, () => prNumber)
-    .replace(/{{PR_TITLE}}/g, () => prTitle)
+    .replace(/{{PR_TITLE}}/g, () => escapeHtml(prTitle))
     .replace(/{{GENERATION_DATE}}/g, () => generationDate)
     .replace(/{{TOTAL_PRICE}}/g, () => formattedPrice)
     .replace(/{{BACKGROUND_CONTENT}}/g, () => background)
