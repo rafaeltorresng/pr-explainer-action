@@ -609,7 +609,15 @@ async function generateExplanation({
     .replace(/{{CODE_CONTENT}}/g, () => codeWalkthrough)
     .replace(/{{QUIZ_CONTENT}}/g, () => quizHtml);
 
-  writeFileSync(outputFilePath, htmlTemplate, 'utf8');
+  try {
+    writeFileSync(outputFilePath, htmlTemplate, 'utf8');
+  } catch (writeError) {
+    throw new Error(
+      `Failed to write output file at "${outputFilePath}" ` +
+      `(content size: ${htmlTemplate.length} bytes): ${writeError.message}`
+    );
+  }
+
   console.log(`\nSuccess. PR explanation generated at: ${outputFilePath}`);
 
   return {

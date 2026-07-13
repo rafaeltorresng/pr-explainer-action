@@ -312,3 +312,21 @@ describe('quiz edge cases', () => {
     })).resolves.toBeDefined();
   });
 });
+
+describe('output write errors', () => {
+  test('writeFileSync failure throws an error with the output path in the message', async () => {
+    const invalidPath = '/nonexistent-dir/deeply/nested/output.html';
+
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+
+    await expect(
+      generateExplanation({
+        diffFilePath: join(process.cwd(), 'sample.patch'),
+        outputFilePath: invalidPath,
+        languageInput: 'pt-BR',
+        apiKey: 'test',
+        mockResponsePath: join(process.cwd(), 'mock.json')
+      })
+    ).rejects.toThrow(invalidPath);
+  });
+});
