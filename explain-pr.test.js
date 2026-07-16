@@ -32,6 +32,8 @@ describe('language configuration', () => {
 
     expect(englishPrompt).toContain('written strictly in English');
     expect(portuguesePrompt).toContain('português do Brasil');
+    expect(englishPrompt).toContain('SOURCE OF TRUTH');
+    expect(portuguesePrompt).toContain('FONTE DA VERDADE');
     expect(englishPrompt).not.toBe(portuguesePrompt);
   });
 });
@@ -82,6 +84,30 @@ describe('artifact rendering', () => {
     expect(html).toContain('Teste seu Entendimento');
     expect(html).toContain('Pergunta 1.');
     expect(html).toContain('Selecionar');
+    expect(html).toContain('Entrada / saída: $0.09 / $0.18 por 1M');
+    expect(html).not.toContain('{{RATE_CHIP}}');
+    expect(html).not.toContain('{{TOTAL_PRICE}}');
+  });
+
+  test('marks cost as n/a when the OpenRouter model is overridden', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    const outputFilePath = join(tempDir, 'custom-model-output.html');
+
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+
+    await generateExplanation({
+      diffFilePath: join(process.cwd(), 'sample.patch'),
+      outputFilePath,
+      languageInput: 'en',
+      apiKey: 'test',
+      modelName: 'openai/gpt-4.1',
+      mockResponsePath: join(process.cwd(), 'mock.json')
+    });
+
+    const html = readFileSync(outputFilePath, 'utf8');
+    expect(html).toContain('Cost: n/a');
+    expect(html).toContain('Rate: per selected OpenRouter model');
+    expect(html).not.toContain('$0.09 / $0.18');
   });
 });
 
