@@ -467,8 +467,8 @@ async function callOpenRouter({
           headers: {
             Authorization: `Bearer ${apiKey}`,
             'Content-Type': 'application/json',
-            'HTTP-Referer': 'https://github.com/SantanaInteligencia/app',
-            'X-Title': 'SIP PR Explainer'
+            'HTTP-Referer': 'https://github.com/rafaeltorresng/pr-explainer-action',
+            'X-Title': 'PR Explainer AI'
           },
           body: JSON.stringify({
             model: modelName,
@@ -584,10 +584,24 @@ async function generateExplanation({
 
   console.log('Injecting content into the HTML template...');
 
-  const inputCost = (usage.prompt_tokens / 1000000) * 0.089;
-  const outputCost = (usage.completion_tokens / 1000000) * 0.18;
-  const totalCost = inputCost + outputCost;
-  const formattedPrice = totalCost.toFixed(6);
+  // OpenRouter list price for the default DeepSeek V4 Flash model.
+  // When users override openrouter_model, do not invent a dollar estimate.
+  const isDefaultModel = modelName === DEFAULT_MODEL_NAME;
+  const inputRatePerMillion = 0.09;
+  const outputRatePerMillion = 0.18;
+  const formattedPrice = isDefaultModel
+    ? `$${(
+        (usage.prompt_tokens / 1000000) * inputRatePerMillion +
+        (usage.completion_tokens / 1000000) * outputRatePerMillion
+      ).toFixed(6)}`
+    : 'n/a';
+  const rateChip = isDefaultModel
+    ? (language === 'pt-BR'
+      ? `Entrada / saída: $${inputRatePerMillion} / $${outputRatePerMillion} por 1M`
+      : `Input / Output: $${inputRatePerMillion} / $${outputRatePerMillion} per 1M`)
+    : (language === 'pt-BR'
+      ? 'Tarifa: conforme o modelo escolhido no OpenRouter'
+      : 'Rate: per selected OpenRouter model');
 
   const background = explanation.background || '';
   const intuition = explanation.intuition || '';
@@ -603,6 +617,7 @@ async function generateExplanation({
     .replace(/{{PR_TITLE}}/g, () => escapeHtml(prTitle))
     .replace(/{{GENERATION_DATE}}/g, () => generationDate)
     .replace(/{{TOTAL_PRICE}}/g, () => formattedPrice)
+    .replace(/{{RATE_CHIP}}/g, () => rateChip)
     .replace(/{{BACKGROUND_CONTENT}}/g, () => background)
     .replace(/{{INTUITION_CONTENT}}/g, () => intuition)
     .replace(/{{DIAGRAMS_CONTENT}}/g, () => diagrams)
