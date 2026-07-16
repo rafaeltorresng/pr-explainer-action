@@ -281,17 +281,24 @@ function renderQuizHtml(quiz, language) {
       optionsHtml += `
             <div class="space-y-2">
                 <button id="btn-q${questionIndex}-o${optionIndex}"
+                        type="button"
                         data-correct="${isCorrect}"
+                        aria-pressed="false"
+                        aria-disabled="false"
                         onclick="selectOption(${questionIndex}, ${optionIndex}, ${isCorrect}, 'ex-q${questionIndex}-o${optionIndex}')"
-                        class="option-btn text-left p-4 w-full rounded-lg border border-gray-800 bg-[#0f0f0f] hover:border-purple-500 text-sm font-sans flex items-center justify-between group">
+                        class="option-btn text-left p-4 w-full rounded-lg border border-gray-800 bg-[#0f0f0f] hover:border-purple-500 text-base font-sans flex items-center justify-between group">
                     <span>${escapeHtml(option)}</span>
                     <span class="opacity-0 group-hover:opacity-100 transition-opacity text-purple-400 text-xs font-mono">${labels.select}</span>
                 </button>
-                <div id="ex-q${questionIndex}-o${optionIndex}" class="explanation-box p-4 rounded-lg bg-gray-900/40 border border-gray-800 text-xs text-gray-400 space-y-1">
-                    <p class="font-bold ${isCorrect ? 'text-green-400' : 'text-red-400'}">
-                        ${isCorrect ? '✓' : '✗'} ${statusLabel}
-                    </p>
-                    <p>${escapeHtml(question.explanations[optionIndex] || '')}</p>
+                <div id="ex-q${questionIndex}-o${optionIndex}" class="explanation-box rounded-lg bg-gray-900/40 border border-gray-800 text-sm text-gray-400">
+                    <div class="explanation-inner">
+                        <div class="p-4 space-y-1">
+                            <p class="font-bold ${isCorrect ? 'text-green-400' : 'text-red-400'}">
+                                ${isCorrect ? '✓' : '✗'} ${statusLabel}
+                            </p>
+                            <p>${escapeHtml(question.explanations[optionIndex] || '')}</p>
+                        </div>
+                    </div>
                 </div>
             </div>`;
     });

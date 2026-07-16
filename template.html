@@ -223,19 +223,47 @@
 
         /* Quiz transitions */
         .option-btn {
-            transition: all 0.2s ease-in-out;
+            transition: border-color 0.2s ease-in-out, background-color 0.2s ease-in-out, color 0.2s ease-in-out;
+        }
+
+        .option-btn:focus-visible {
+            outline: 2px solid var(--accent-color);
+            outline-offset: 2px;
+        }
+
+        .option-btn[aria-disabled="true"] {
+            cursor: default;
         }
 
         .explanation-box {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease-out, opacity 0.3s ease-out;
+            display: grid;
+            grid-template-rows: 0fr;
             opacity: 0;
+            transition: grid-template-rows 0.28s ease-out, opacity 0.28s ease-out;
+        }
+
+        .explanation-box > .explanation-inner {
+            overflow: hidden;
+            min-height: 0;
         }
 
         .explanation-box.show {
-            max-height: 300px;
+            grid-template-rows: 1fr;
             opacity: 1;
+        }
+
+        .diagram-panel {
+            overflow-x: auto;
+        }
+
+        .diagram-panel > * {
+            min-width: 0;
+        }
+
+        @media (max-width: 1024px) {
+            .mascot-wrapper {
+                display: none;
+            }
         }
     </style>
 </head>
@@ -267,22 +295,27 @@
                         <nav class="space-y-3">
                             <a href="#background" id="link-background" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">1. Background</a>
                             <a href="#intuition" id="link-intuition" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">2. Intuition</a>
-                            <a href="#diagrams" id="link-diagrams" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">3. Diagrams</a>
-                            <a href="#code-walkthrough" id="link-code-walkthrough" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">4. Code</a>
-                            <a href="#quiz" id="link-quiz" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">5. PR Quiz</a>
+                            <a href="#diagrams" id="link-diagrams" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">3. Flow Diagrams</a>
+                            <a href="#code-walkthrough" id="link-code-walkthrough" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">4. Code Walkthrough</a>
+                            <a href="#quiz" id="link-quiz" class="nav-link block py-1 text-lg font-serif text-gray-400 hover:text-white transition-colors">5. Test Your Understanding</a>
                         </nav>
                     </div>
 
                     <!-- Quiz progress and footer -->
                     <div class="space-y-8 mt-auto pt-8">
                         <!-- Quiz progress card -->
-                        <div id="quiz-progress-box" class="p-4 rounded-xl border border-gray-800 bg-[#0e0e0e]/50 space-y-2 hidden">
-                            <h4 class="text-xs font-mono uppercase text-gray-400 tracking-wider">Quiz Score</h4>
-                            <div class="flex items-baseline gap-1">
-                                <span id="quiz-score" class="text-2xl font-bold font-mono text-purple-400">0</span>
-                                <span class="text-sm text-gray-500 font-mono">/ 5 correct</span>
+                        <div id="quiz-progress-box" class="p-4 rounded-xl border border-gray-800 bg-[#0e0e0e]/50 space-y-3 hidden">
+                            <h4 class="text-xs font-mono uppercase text-gray-400 tracking-wider">Quiz</h4>
+                            <div class="flex items-baseline justify-between gap-3">
+                                <div class="flex items-baseline gap-1">
+                                    <span id="quiz-score" class="text-2xl font-bold font-mono text-purple-400">0</span>
+                                    <span class="text-sm text-gray-500 font-mono">/ 5 correct</span>
+                                </div>
+                                <div class="text-xs text-gray-500 font-mono">
+                                    <span id="quiz-answered">0</span>/5 answered
+                                </div>
                             </div>
-                            <div class="w-full bg-gray-800 rounded-full h-1 overflow-hidden">
+                            <div class="w-full bg-gray-800 rounded-full h-1 overflow-hidden" aria-hidden="true">
                                 <div id="quiz-progress-bar" class="bg-purple-500 h-1 rounded-full transition-all duration-300" style="width: 0%"></div>
                             </div>
                         </div>
@@ -310,8 +343,6 @@
                         <p class="header-summary font-sans">A clear read of this PR's changes.</p>
                         <div class="flex flex-wrap items-center gap-2 text-sm text-gray-500 font-mono">
                             <span class="meta-chip">Generated on {{GENERATION_DATE}}</span>
-                            <span class="meta-chip">Cost: {{TOTAL_PRICE}}</span>
-                            <span class="meta-chip">{{RATE_CHIP}}</span>
                         </div>
                     </div>
                 </div>
@@ -322,6 +353,7 @@
                     <!-- BACKGROUND -->
                     <section id="background" class="scroll-mt-24 space-y-5">
                         <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">1. Background</h2>
+                        <p class="section-intro font-sans text-gray-500">The system context behind this change.</p>
                         <div class="reading-body font-sans space-y-5">
                             {{BACKGROUND_CONTENT}}
                         </div>
@@ -330,6 +362,7 @@
                     <!-- INTUITION -->
                     <section id="intuition" class="scroll-mt-24 space-y-5">
                         <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">2. Intuition</h2>
+                        <p class="section-intro font-sans text-gray-500">The essence of the change, without every implementation detail.</p>
                         <div class="reading-body font-sans space-y-5">
                             {{INTUITION_CONTENT}}
                         </div>
@@ -338,7 +371,8 @@
                     <!-- DIAGRAMS -->
                     <section id="diagrams" class="scroll-mt-24 space-y-5">
                         <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">3. Flow Diagrams</h2>
-                        <div class="reading-body p-6 rounded-xl border border-gray-850 bg-[#0c0c0c] font-sans space-y-6">
+                        <p class="section-intro font-sans text-gray-500">How data and control move through the change.</p>
+                        <div class="reading-body diagram-panel p-6 rounded-xl border border-gray-800 bg-[#0c0c0c] font-sans space-y-6">
                             {{DIAGRAMS_CONTENT}}
                         </div>
                     </section>
@@ -346,6 +380,7 @@
                     <!-- CODE WALKTHROUGH -->
                     <section id="code-walkthrough" class="scroll-mt-24 space-y-5">
                         <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">4. Code Walkthrough</h2>
+                        <p class="section-intro font-sans text-gray-500">The modified paths, ordered for reading.</p>
                         <div class="reading-body font-sans space-y-6">
                             {{CODE_CONTENT}}
                         </div>
@@ -366,8 +401,12 @@
 
                 <!-- FOOTER -->
                 <footer class="border-t border-gray-900 bg-[#060606] py-8 text-center text-xs font-mono text-gray-600">
-                    <div class="max-w-4xl mx-auto px-6">
+                    <div class="max-w-4xl mx-auto px-6 space-y-4">
                         <p>Understanding is the new bottleneck</p>
+                        <div class="flex flex-wrap items-center justify-center gap-2 text-gray-500">
+                            <span class="meta-chip">Cost: {{TOTAL_PRICE}}</span>
+                            <span class="meta-chip">{{RATE_CHIP}}</span>
+                        </div>
                     </div>
                 </footer>
 
@@ -511,43 +550,51 @@
             if (answersState[questionIndex] !== undefined) return;
 
             answersState[questionIndex] = optionIndex;
-            
+
             // Show the quiz progress box in the sidebar
             document.getElementById('quiz-progress-box').classList.remove('hidden');
 
             const optionButton = document.getElementById(`btn-q${questionIndex}-o${optionIndex}`);
+            const optionsContainer = optionButton ? optionButton.closest('.grid') : null;
 
             if (isCorrect) {
-                // Correct style (Green)
                 optionButton.classList.remove('border-gray-800', 'hover:border-purple-500', 'bg-[#0f0f0f]');
                 optionButton.classList.add('border-green-500', 'bg-green-950/20', 'text-green-400');
                 score++;
             } else {
-                // Incorrect style (Red)
                 optionButton.classList.remove('border-gray-800', 'hover:border-purple-500', 'bg-[#0f0f0f]');
                 optionButton.classList.add('border-red-500', 'bg-red-950/20', 'text-red-400');
-                
-                // Highlight the correct option in green
-                const optionsContainer = optionButton.closest('.grid');
+
+                if (optionsContainer) {
+                    const correctButton = optionsContainer.querySelector('[data-correct="true"]');
+                    if (correctButton) {
+                        correctButton.classList.remove('border-gray-800', 'bg-[#0f0f0f]');
+                        correctButton.classList.add('border-green-500/50', 'bg-green-950/10', 'text-green-500/80');
+                    }
+                }
+            }
+
+            // Reveal only the selected explanation; if wrong, also reveal the correct one
+            const selectedBox = document.getElementById(explanationId);
+            if (selectedBox) selectedBox.classList.add('show');
+
+            if (!isCorrect && optionsContainer) {
                 const correctButton = optionsContainer.querySelector('[data-correct="true"]');
                 if (correctButton) {
-                    correctButton.classList.remove('border-gray-800', 'bg-[#0f0f0f]');
-                    correctButton.classList.add('border-green-500/50', 'bg-green-950/10', 'text-green-500/80');
+                    const correctBox = document.getElementById(correctButton.id.replace(/^btn-/, 'ex-'));
+                    if (correctBox) correctBox.classList.add('show');
                 }
             }
 
-            // Show the explanations for every option in the question
-            const optionsContainer = optionButton ? optionButton.closest('.grid') : null;
             if (optionsContainer) {
-                const boxes = optionsContainer.querySelectorAll('.explanation-box');
-                boxes.forEach(box => box.classList.add('show'));
-            } else {
-                for (let i = 0; i < 4; i++) {
-                    const box = document.getElementById(`ex-q${questionIndex}-o${i}`);
-                    if (box) box.classList.add('show');
-                }
+                optionsContainer.querySelectorAll('.option-btn').forEach((btn) => {
+                    btn.setAttribute('aria-disabled', 'true');
+                    btn.setAttribute('aria-pressed', btn === optionButton ? 'true' : 'false');
+                });
+            } else if (optionButton) {
+                optionButton.setAttribute('aria-pressed', 'true');
+                optionButton.setAttribute('aria-disabled', 'true');
             }
-
 
             // Show reset button
             const resetBtn = document.getElementById(`reset-q${questionIndex}`);
@@ -573,11 +620,15 @@
                 }, 3000);
             }
 
-            // Update the sidebar score
+            updateQuizSidebar();
+        }
+
+        function updateQuizSidebar() {
             document.getElementById('quiz-score').innerText = score;
             const answeredCount = Object.keys(answersState).length;
-            const progressPct = (answeredCount / 5) * 100;
-            document.getElementById('quiz-progress-bar').style.width = `${progressPct}%`;
+            const answeredEl = document.getElementById('quiz-answered');
+            if (answeredEl) answeredEl.innerText = answeredCount;
+            document.getElementById('quiz-progress-bar').style.width = `${(answeredCount / 5) * 100}%`;
         }
 
         // Reset a specific question back to its initial state
@@ -604,7 +655,7 @@
             if (optionsContainer) {
                 const buttons = optionsContainer.querySelectorAll('.option-btn');
                 buttons.forEach(btn => {
-                    btn.className = "option-btn text-left p-4 w-full rounded-lg border border-gray-800 bg-[#0f0f0f] hover:border-purple-500 text-sm font-sans flex items-center justify-between group";
+                    btn.className = "option-btn text-left p-4 w-full rounded-lg border border-gray-800 bg-[#0f0f0f] hover:border-purple-500 text-base font-sans flex items-center justify-between group";
                 });
                 const boxes = optionsContainer.querySelectorAll('.explanation-box');
                 boxes.forEach(box => {
@@ -615,18 +666,21 @@
                 for (let i = 0; i < 4; i++) {
                     const btn = document.getElementById(`btn-q${questionIndex}-o${i}`);
                     if (btn) {
-                        btn.className = "option-btn text-left p-4 w-full rounded-lg border border-gray-800 bg-[#0f0f0f] hover:border-purple-500 text-sm font-sans flex items-center justify-between group";
+                        btn.className = "option-btn text-left p-4 w-full rounded-lg border border-gray-800 bg-[#0f0f0f] hover:border-purple-500 text-base font-sans flex items-center justify-between group";
                     }
                     const box = document.getElementById(`ex-q${questionIndex}-o${i}`);
                     if (box) box.classList.remove('show');
                 }
             }
 
-            // Update the sidebar score
-            document.getElementById('quiz-score').innerText = score;
-            const answeredCount = Object.keys(answersState).length;
-            const progressPct = (answeredCount / 5) * 100;
-            document.getElementById('quiz-progress-bar').style.width = `${progressPct}%`;
+            if (optionsContainer) {
+                optionsContainer.querySelectorAll('.option-btn').forEach((btn) => {
+                    btn.setAttribute('aria-pressed', 'false');
+                    btn.setAttribute('aria-disabled', 'false');
+                });
+            }
+
+            updateQuizSidebar();
         }
     </script>
 </body>
