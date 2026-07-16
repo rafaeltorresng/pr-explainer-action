@@ -59,7 +59,7 @@ The Action uploads the HTML as a workflow artifact and posts a link on the PR. U
 | --- | --- | --- |
 | `openrouter_api_key` | required | OpenRouter API key used for generation. |
 | `language` | `en` | `en` or `pt-BR`. |
-| `max_lines` | `5000` | Skip generation when the PR exceeds this change size. |
+| `max_lines` | `15000` | Skip generation when the PR exceeds this change size. |
 | `openrouter_model` | `deepseek/deepseek-v4-flash` | Override the OpenRouter model when needed. |
 | `output_file` | `pr-explanation.html` | Generated HTML filename. |
 | `artifact_name` | `pr-explanation-html` | Artifact name shown in GitHub Actions. |
@@ -71,7 +71,7 @@ The workflow needs `actions/checkout` with `fetch-depth: 0`. To post the PR comm
 
 `git diff` → bounded diff → OpenRouter → structured explanation → standalone HTML artifact
 
-The Action retries failed model calls, rejects malformed or incomplete JSON, and limits the diff sent to the model. The result is a single HTML document you can open in a browser—no app or server required. The template loads Tailwind CSS and fonts from a CDN when opened.
+The Action retries failed model calls, rejects malformed or incomplete JSON, limits the diff sent to the model, and keeps all styling inside the generated file. The result works as a single downloaded HTML document: no app, server, or external stylesheet required.
 
 ## Local verification
 

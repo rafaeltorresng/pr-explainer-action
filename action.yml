@@ -12,7 +12,7 @@ inputs:
   max_lines:
     description: 'Maximum added plus deleted lines allowed before skipping generation.'
     required: false
-    default: '5000'
+    default: '15000'
   openrouter_model:
     description: 'OpenRouter model identifier. Users can override it with any model available in OpenRouter.'
     required: false
