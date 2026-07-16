@@ -1,0 +1,23 @@
+name: explain-pr
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+jobs:
+  explain:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Dogfood: run the Action from this PR's branch
+      - uses: ./
+        with:
+          openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
+          language: en

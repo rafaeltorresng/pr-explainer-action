@@ -34,6 +34,10 @@ describe('language configuration', () => {
     expect(portuguesePrompt).toContain('português do Brasil');
     expect(englishPrompt).toContain('SOURCE OF TRUTH');
     expect(portuguesePrompt).toContain('FONTE DA VERDADE');
+    expect(englishPrompt).toContain('Deep background');
+    expect(portuguesePrompt).toContain('Contexto profundo');
+    expect(englishPrompt).toContain('at most 2 diagrams');
+    expect(portuguesePrompt).toContain('no máximo 2 diagramas');
     expect(englishPrompt).not.toBe(portuguesePrompt);
   });
 });
@@ -85,8 +89,38 @@ describe('artifact rendering', () => {
     expect(html).toContain('Pergunta 1.');
     expect(html).toContain('Selecionar');
     expect(html).toContain('Entrada / saída: $0.09 / $0.18 por 1M');
+    expect(html).toContain('diagram-panel');
+    expect(html).toContain('explanation-inner');
+    expect(html).toContain('quiz-answered');
+    expect(html).toContain('O contexto do sistema por trás desta mudança.');
+    expect(html).toContain('aria-pressed="false"');
     expect(html).not.toContain('{{RATE_CHIP}}');
     expect(html).not.toContain('{{TOTAL_PRICE}}');
+    expect(html).not.toContain('max-height: 300px');
+  });
+
+  test('English artifact moves cost chips to the footer and keeps section intros', async () => {
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-'));
+    const outputFilePath = join(tempDir, 'en-output.html');
+
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+
+    await generateExplanation({
+      diffFilePath: join(process.cwd(), 'sample.patch'),
+      outputFilePath,
+      languageInput: 'en',
+      apiKey: 'test',
+      mockResponsePath: join(process.cwd(), 'mock.json')
+    });
+
+    const html = readFileSync(outputFilePath, 'utf8');
+    const footerIndex = html.indexOf('<footer');
+    const costIndex = html.indexOf('Cost: $');
+    expect(footerIndex).toBeGreaterThan(-1);
+    expect(costIndex).toBeGreaterThan(footerIndex);
+    expect(html).toContain('The system context behind this change.');
+    expect(html).toContain('How data and control move through the change.');
+    expect(html).toContain('text-base font-sans flex items-center justify-between group');
   });
 
   test('marks cost as n/a when the OpenRouter model is overridden', async () => {
