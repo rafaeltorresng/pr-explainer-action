@@ -16,6 +16,8 @@ Each artifact is deliberately designed as a document someone wants to read, rath
 - A code walkthrough focused on the changed paths
 - A five-question quiz with feedback
 
+![PR Explainer AI HTML artifact](public/artifact-preview.png)
+
 ## Why this exists
 
 Shipping code has become faster. Building shared understanding has not.
@@ -71,7 +73,7 @@ The workflow needs `actions/checkout` with `fetch-depth: 0`. To post the PR comm
 
 `git diff` → bounded diff → OpenRouter → structured explanation → standalone HTML artifact
 
-The Action retries failed model calls, rejects malformed or incomplete JSON, limits the diff sent to the model, and keeps all styling inside the generated file. The result works as a single downloaded HTML document: no app, server, or external stylesheet required.
+The Action retries failed model calls, rejects malformed or incomplete JSON, and limits the diff sent to the model. The result is a single HTML document with inlined layout assets (including the quiz UI and mascot). When opened in a browser it loads Tailwind CSS and fonts from CDNs — no app or server required.
 
 ## Local verification
 
