@@ -2,7 +2,7 @@ name: explain-pr
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened]
 
 jobs:
   explain:
@@ -20,4 +20,4 @@ jobs:
       - uses: ./
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
-          language: pt-BR
+          language: en
