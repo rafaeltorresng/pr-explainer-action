@@ -34,8 +34,12 @@ describe('language configuration', () => {
     expect(portuguesePrompt).toContain('português do Brasil');
     expect(englishPrompt).toContain('SOURCE OF TRUTH');
     expect(portuguesePrompt).toContain('FONTE DA VERDADE');
-    expect(englishPrompt).toContain('Deep background');
-    expect(portuguesePrompt).toContain('Contexto profundo');
+    expect(englishPrompt).toContain('BACKGROUND BREVITY');
+    expect(portuguesePrompt).toContain('BREVIDADE DO CONTEXTO');
+    expect(englishPrompt).toContain('diff-scoped');
+    expect(portuguesePrompt).toContain('ancorado no diff');
+    expect(englishPrompt).not.toContain('Deep background');
+    expect(portuguesePrompt).not.toContain('Contexto profundo');
     expect(englishPrompt).toContain('at most 2 diagrams');
     expect(portuguesePrompt).toContain('no máximo 2 diagramas');
     expect(englishPrompt).not.toBe(portuguesePrompt);
@@ -92,7 +96,7 @@ describe('artifact rendering', () => {
     expect(html).toContain('diagram-panel');
     expect(html).toContain('explanation-inner');
     expect(html).toContain('quiz-answered');
-    expect(html).toContain('O contexto do sistema por trás desta mudança.');
+    expect(html).toContain('O estado anterior que este diff altera.');
     expect(html).toContain('aria-pressed="false"');
     expect(html).not.toContain('{{RATE_CHIP}}');
     expect(html).not.toContain('{{TOTAL_PRICE}}');
@@ -118,7 +122,7 @@ describe('artifact rendering', () => {
     const costIndex = html.indexOf('Cost: $');
     expect(footerIndex).toBeGreaterThan(-1);
     expect(costIndex).toBeGreaterThan(footerIndex);
-    expect(html).toContain('The system context behind this change.');
+    expect(html).toContain('What this change is reacting to.');
     expect(html).toContain('How data and control move through the change.');
     expect(html).toContain('text-base font-sans flex items-center justify-between group');
   });
