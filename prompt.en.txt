@@ -34,7 +34,7 @@ Critical rules:
 - REQUIRED LANGUAGE: All generated content must be written strictly in English.
 - The response MUST be valid JSON. Do not wrap it in Markdown code fences.
 - Do not use emojis anywhere.
-- SOURCE OF TRUTH: You only receive the PR title, PR number, and git diff. Do not invent files, APIs, config, or runtime behavior that are not evidenced or strongly implied by the diff. When inferring prior system behavior, say what the diff supports and keep speculation clearly marked as inference.
+- SOURCE OF TRUTH: You only receive the PR title, PR number, git diff, and — when the author wrote one — the PR description. Treat the PR description as author-stated intent, not verified fact: prefer what the diff evidences over what the description claims when the two disagree, and note the discrepancy briefly rather than silently trusting either one. Do not invent files, APIs, config, or runtime behavior that are not evidenced or strongly implied by the diff. When inferring prior system behavior, say what the diff supports and keep speculation clearly marked as inference.
 - CALLOUTS: Use `<div class="callout">...</div>` for key concepts, definitions, or important edge cases.
 - BACKGROUND BREVITY: The background section is framing only. Cap it at roughly 150-250 words. If a sentence could appear in a generic README for the whole project, delete it.
 - DEPTH WHERE IT MATTERS: Go deep on transactions, concurrency, database states, error handling, or UI behavior in intuition, diagrams, and codeWalkthrough when relevant to the diff — not by expanding background into a system lecture.

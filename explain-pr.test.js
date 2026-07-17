@@ -6,6 +6,7 @@ const { describe, expect, test } = require('bun:test');
 const {
   DEFAULT_MODEL_NAME,
   FETCH_TIMEOUT_MS,
+  buildUserPrompt,
   generateExplanation,
   getPrompt,
   normalizeLanguage,
@@ -43,6 +44,67 @@ describe('language configuration', () => {
     expect(englishPrompt).toContain('at most 2 diagrams');
     expect(portuguesePrompt).toContain('no máximo 2 diagramas');
     expect(englishPrompt).not.toBe(portuguesePrompt);
+  });
+});
+
+describe('user prompt construction', () => {
+  test('includes the PR description section when a body is present (en)', () => {
+    const prompt = buildUserPrompt({
+      language: 'en',
+      prTitle: 'Add caching layer',
+      prNumber: '42',
+      prBody: 'This PR introduces an LRU cache to cut repeated DB calls.',
+      cappedDiff: 'diff --git a/x b/x'
+    });
+
+    expect(prompt).toContain('Here is the Pull Request description:');
+    expect(prompt).toContain('This PR introduces an LRU cache to cut repeated DB calls.');
+    expect(prompt.indexOf('description')).toBeLessThan(prompt.indexOf('diff --git'));
+  });
+
+  test('includes the PR description section when a body is present (pt-BR)', () => {
+    const prompt = buildUserPrompt({
+      language: 'pt-BR',
+      prTitle: 'Adiciona camada de cache',
+      prNumber: '42',
+      prBody: 'Este PR introduz um cache LRU para reduzir chamadas repetidas ao banco.',
+      cappedDiff: 'diff --git a/x b/x'
+    });
+
+    expect(prompt).toContain('Esta é a descrição do Pull Request:');
+    expect(prompt).toContain('Este PR introduz um cache LRU para reduzir chamadas repetidas ao banco.');
+  });
+
+  test('omits the description section entirely when the PR has no body', () => {
+    const englishPrompt = buildUserPrompt({
+      language: 'en',
+      prTitle: 'Add caching layer',
+      prNumber: '42',
+      prBody: '',
+      cappedDiff: 'diff --git a/x b/x'
+    });
+    const portuguesePrompt = buildUserPrompt({
+      language: 'pt-BR',
+      prTitle: 'Adiciona camada de cache',
+      prNumber: '42',
+      prBody: undefined,
+      cappedDiff: 'diff --git a/x b/x'
+    });
+
+    expect(englishPrompt).not.toContain('Pull Request description');
+    expect(portuguesePrompt).not.toContain('descrição do Pull Request');
+  });
+
+  test('omits the description section when the PR body is only whitespace', () => {
+    const prompt = buildUserPrompt({
+      language: 'en',
+      prTitle: 'Add caching layer',
+      prNumber: '42',
+      prBody: '   \n\t  ',
+      cappedDiff: 'diff --git a/x b/x'
+    });
+
+    expect(prompt).not.toContain('Pull Request description');
   });
 });
 

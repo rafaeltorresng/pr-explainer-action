@@ -46,6 +46,7 @@ function normalizeLanguage(input) {
 function readEventContext() {
   let prTitle = process.env.PR_TITLE || 'Code Changes';
   let prNumber = process.env.PR_NUMBER || '0';
+  let prBody = '';
 
   const eventPath = process.env.GITHUB_EVENT_PATH;
   if (eventPath && existsSync(eventPath)) {
@@ -54,13 +55,14 @@ function readEventContext() {
       if (eventData.pull_request) {
         prTitle = eventData.pull_request.title || prTitle;
         prNumber = String(eventData.pull_request.number || prNumber);
+        prBody = (eventData.pull_request.body || '').trim();
       }
     } catch (error) {
       console.error('Failed to read the GitHub event payload:', error);
     }
   }
 
-  return { prTitle, prNumber };
+  return { prTitle, prNumber, prBody };
 }
 
 function getDiffContent(diffFilePath) {
@@ -247,10 +249,16 @@ function getGenerationDate(language) {
   });
 }
 
-function buildUserPrompt({ language, prTitle, prNumber, cappedDiff }) {
+function buildUserPrompt({ language, prTitle, prNumber, prBody, cappedDiff }) {
+  const hasBody = Boolean(prBody && prBody.trim().length > 0);
+
   if (language === 'pt-BR') {
+    const descriptionSection = hasBody
+      ? `\n\nEsta é a descrição do Pull Request:\n"""\n${prBody.trim()}\n"""`
+      : '';
+
     return `Este é o título do Pull Request: "${prTitle}"
-Número do PR: ${prNumber}
+Número do PR: ${prNumber}${descriptionSection}
 
 Este é o git diff a ser analisado:
 \`\`\`diff
@@ -258,8 +266,12 @@ ${cappedDiff}
 \`\`\``;
   }
 
+  const descriptionSection = hasBody
+    ? `\n\nHere is the Pull Request description:\n"""\n${prBody.trim()}\n"""`
+    : '';
+
   return `Here is the Pull Request title: "${prTitle}"
-PR number: ${prNumber}
+PR number: ${prNumber}${descriptionSection}
 
 Here is the git diff to analyze:
 \`\`\`diff
@@ -545,7 +557,7 @@ async function generateExplanation({
   }
 
   const language = normalizeLanguage(languageInput);
-  const { prTitle, prNumber } = readEventContext();
+  const { prTitle, prNumber, prBody } = readEventContext();
   const diffContent = getDiffContent(diffFilePath);
 
   if (diffContent.length === 0) {
@@ -558,7 +570,7 @@ async function generateExplanation({
   let htmlTemplate = readFileSync(templatePath, 'utf8');
   const systemInstruction = getPrompt(language);
   const cappedDiff = diffContent.substring(0, 40000);
-  const userPrompt = buildUserPrompt({ language, prTitle, prNumber, cappedDiff });
+  const userPrompt = buildUserPrompt({ language, prTitle, prNumber, prBody, cappedDiff });
 
   console.log(`Starting OpenRouter request (${modelName}) with language ${language}...`);
 
@@ -683,6 +695,7 @@ module.exports = {
   FETCH_TIMEOUT_MS,
   LANGUAGE_CONFIG,
   buildTargetCorrectIndexes,
+  buildUserPrompt,
   generateExplanation,
   getPrompt,
   normalizeLanguage,
