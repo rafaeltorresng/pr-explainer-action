@@ -1,0 +1,12 @@
+diff --git a/migrations/20261110_add_tenant_created_idx.sql b/migrations/20261110_add_tenant_created_idx.sql
+new file mode 100644
+index 0000000..7c9f8a1
+--- /dev/null
++++ b/migrations/20261110_add_tenant_created_idx.sql
+@@ -0,0 +1,6 @@
++-- Add composite index to accelerate audit log filtering by tenant ordered by timestamp
++CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_tenant_created_at
++  ON audit_logs (tenant_id, created_at DESC)
++  INCLUDE (action, user_id);
++
++COMMENT ON INDEX idx_audit_logs_tenant_created_at IS 'Optimizes recent activity dashboard queries';

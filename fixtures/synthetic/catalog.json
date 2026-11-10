@@ -1,0 +1,171 @@
+[
+  {
+    "id": "01-small-bugfix",
+    "title": "fix: correct off-by-one pagination offset calculation",
+    "category": "bugfix",
+    "prNumber": 101,
+    "description": "Fixes pagination offset so page 1 starts at 0 instead of skipping the first page.",
+    "patchFile": "01-small-bugfix.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Clamps page number to minimum 1 with Math.max",
+        "Calculates offset as (safePage - 1) * limit instead of page * limit"
+      ],
+      "authorIntent": "Fixes pagination offset calculation for page 1",
+      "unknowns": "Database dialect or upper bound pagination limits"
+    }
+  },
+  {
+    "id": "02-new-feature",
+    "title": "feat: add in-memory LRU cache with eviction",
+    "category": "feature",
+    "prNumber": 102,
+    "description": "Introduces LRUCache class to cache frequent lookups and bound memory consumption.",
+    "patchFile": "02-new-feature.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Uses Map insertion ordering to track recency",
+        "Evicts oldest key when size exceeds capacity",
+        "Re-inserts key on get() to mark as recently used"
+      ],
+      "authorIntent": "Cache frequent lookups with bounded memory",
+      "unknowns": "Thread safety or cross-process concurrency"
+    }
+  },
+  {
+    "id": "03-refactoring",
+    "title": "refactor: decompose token validation into check pipeline",
+    "category": "refactor",
+    "prNumber": 103,
+    "description": "Refactors token validator to make adding future checks easier without changing public interface.",
+    "patchFile": "03-refactoring.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Introduces check pipeline array of CheckFn functions",
+        "Maintains identical checks: missing, length < 32, prefix tk_",
+        "Public function signature validateToken remains unchanged"
+      ],
+      "authorIntent": "Make adding future checks easier",
+      "unknowns": "Performance impact of array iteration vs inline ifs"
+    }
+  },
+  {
+    "id": "04-db-migration",
+    "title": "db: add composite index on audit_logs(tenant_id, created_at)",
+    "category": "database",
+    "prNumber": 104,
+    "description": "Adds index to speed up tenant dashboard audit queries.",
+    "patchFile": "04-db-migration.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Creates index CONCURRENTLY to prevent locking writes",
+        "Composite index on tenant_id and created_at DESC",
+        "Covers action and user_id via INCLUDE clause"
+      ],
+      "authorIntent": "Optimizes recent activity dashboard queries",
+      "unknowns": "Table size and disk space consumed during index build"
+    }
+  },
+  {
+    "id": "05-api-change",
+    "title": "api: support x-api-version header for /api/users",
+    "category": "api",
+    "prNumber": 105,
+    "description": "Allows clients to opt-in to users v2 payload while defaulting to v1.",
+    "patchFile": "05-api-change.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Inspects req.headers['x-api-version']",
+        "Dispatches to handleGetUsersV2 only when header is '2'",
+        "Defaults to handleGetUsersV1 for backwards compatibility"
+      ],
+      "authorIntent": "Opt-in v2 payload support",
+      "unknowns": "Differences between v1 and v2 response payloads"
+    }
+  },
+  {
+    "id": "06-infra-workflow-script",
+    "title": "ci: add deploy policy synchronization step to workflow",
+    "category": "infra",
+    "prNumber": 106,
+    "description": "Update deploy policy and trigger worker re-deployment in production.",
+    "patchFile": "06-infra-workflow-script.patch",
+    "referencedScripts": ["scripts/deploy-policy.sh"],
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Adds 'Sync Policy Graph' step calling ./scripts/deploy-policy.sh",
+        "Sets POLICY_ENV=production in step environment",
+        "Referenced script PATCHes policy API, does NOT trigger immediate deployment"
+      ],
+      "authorIntent": "Claims to update policy AND trigger worker redeployment",
+      "unknowns": "External server handling of PATCH /api/v1/policy"
+    }
+  },
+  {
+    "id": "07-frontend",
+    "title": "ui: add accessible dialog attributes and escape key listener to Modal",
+    "category": "frontend",
+    "prNumber": 107,
+    "description": "Improves modal dialog accessibility and adds keyboard escape closing.",
+    "patchFile": "07-frontend.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Adds role='dialog', aria-modal='true', aria-labelledby='modal-title'",
+        "Listens for 'Escape' keydown to trigger onClose",
+        "Focuses modalRef container on open"
+      ],
+      "authorIntent": "Improves modal accessibility and keyboard navigation",
+      "unknowns": "Screen reader announcements in different browsers"
+    }
+  },
+  {
+    "id": "08-large-multifile",
+    "title": "feat: propagate distributed trace id across http, db, and queue",
+    "category": "large",
+    "prNumber": 108,
+    "description": "Thread trace IDs through inbound HTTP requests, database queries, and worker queue jobs.",
+    "patchFile": "08-large-multifile.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Modifies 5 separate files across telemetry, http, db, and queue",
+        "Extracts or generates x-trace-id in middleware",
+        "Passes traceId to query() and enqueue() functions"
+      ],
+      "authorIntent": "Distributed tracing correlation",
+      "unknowns": "Downstream log aggregation and sampling rates"
+    }
+  },
+  {
+    "id": "09-misleading-description",
+    "title": "chore: redeploy worker on schedule",
+    "category": "misleading",
+    "prNumber": 109,
+    "description": "This PR triggers a full production worker redeployment and clears caches.",
+    "patchFile": "09-misleading-description.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Diff only checks args.includes('--dry-run') instead of hardcoded dryRun=true",
+        "Does NOT trigger any redeployment or clear any cache"
+      ],
+      "authorIntent": "Claims full production redeployment and cache clearing",
+      "unknowns": "Who invokes runDeployCli and with what arguments"
+    }
+  },
+  {
+    "id": "10-ambiguous-error-handler",
+    "title": "fix: avoid retrying 4xx client errors without usage",
+    "category": "ambiguous",
+    "prNumber": 110,
+    "description": "Mark client rejections as non-retryable and classify 429 as rate limited.",
+    "patchFile": "10-ambiguous-error-handler.patch",
+    "groundTruth": {
+      "verifiedCodeFacts": [
+        "Treats status >= 400 && status < 500 as retryable: false, kind: 'known_rejection'",
+        "Parses Retry-After header for status 429",
+        "Returns retryable: true, kind: 'unknown' for other statuses (e.g. 5xx)"
+      ],
+      "authorIntent": "Avoid retrying client errors without usage",
+      "unknowns": "Whether 4xx implies absence of server-side computation"
+    }
+  }
+]

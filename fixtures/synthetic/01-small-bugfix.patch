@@ -1,0 +1,20 @@
+diff --git a/src/pagination.ts b/src/pagination.ts
+index 83a1b02..c914d33 100644
+--- a/src/pagination.ts
++++ b/src/pagination.ts
+@@ -12,3 +12,3 @@ export function calculatePagination(page: number, limit: number): { offset: numb
+   const safePage = Math.max(1, page);
+-  const offset = page * limit;
++  const offset = (safePage - 1) * limit;
+   return { offset, limit };
+diff --git a/test/pagination.test.ts b/test/pagination.test.ts
+index 45b8101..12c9384 100644
+--- a/test/pagination.test.ts
++++ b/test/pagination.test.ts
+@@ -8,2 +8,6 @@ describe('pagination', () => {
+     expect(calculatePagination(1, 20)).toEqual({ offset: 0, limit: 20 });
++    expect(calculatePagination(2, 20)).toEqual({ offset: 20, limit: 20 });
++  });
++  test('clamps page numbers below 1', () => {
++    expect(calculatePagination(0, 10)).toEqual({ offset: 0, limit: 10 });
+   });

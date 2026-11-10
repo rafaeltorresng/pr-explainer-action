@@ -33,7 +33,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bun -e 'const fs=require("node:fs"); const payload={choices:[{message:{content:JSON.stringify({background:"<p>Background.</p>",intuition:"<p>Intuition.</p>",diagrams:"<div>Diagram.</div>",codeWalkthrough:"<pre>const x = 1;</pre>",quiz:[{question:"Q1?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]},{question:"Q2?",options:["A","B","C","D"],correctOptionIndex:2,explanations:["e0","e1","e2","e3"]},{question:"Q3?",options:["A","B","C","D"],correctOptionIndex:3,explanations:["e0","e1","e2","e3"]},{question:"Q4?",options:["A","B","C","D"],correctOptionIndex:0,explanations:["e0","e1","e2","e3"]},{question:"Q5?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]}]})}}],usage:{prompt_tokens:111,completion_tokens:222,total_tokens:333}}; fs.writeFileSync("mock.json", JSON.stringify(payload));'
+          bun -e 'const fs=require("node:fs"); const payload={choices:[{message:{content:JSON.stringify({background:"<span data-injected='true'>Background.</span>",intuition:"<span data-injected='true'>Intuition.</span>",diagrams:"<div data-injected='true'>Diagram.</div>",codeWalkthrough:"<pre data-injected='true'>const x = 1;</pre>",quiz:[{question:"Q1?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]},{question:"Q2?",options:["A","B","C","D"],correctOptionIndex:2,explanations:["e0","e1","e2","e3"]},{question:"Q3?",options:["A","B","C","D"],correctOptionIndex:3,explanations:["e0","e1","e2","e3"]},{question:"Q4?",options:["A","B","C","D"],correctOptionIndex:0,explanations:["e0","e1","e2","e3"]},{question:"Q5?",options:["A","B","C","D"],correctOptionIndex:1,explanations:["e0","e1","e2","e3"]}]})}}],usage:{prompt_tokens:111,completion_tokens:222,total_tokens:333}}; fs.writeFileSync("mock.json", JSON.stringify(payload));'
 
       - name: Run unit tests
         shell: bash
@@ -46,6 +46,7 @@ jobs:
         env:
           OPENROUTER_MOCK_RESPONSE_PATH: mock.json
         with:
+          mode: generate
           openrouter_api_key: test
           openrouter_model: deepseek/deepseek-v4-flash
           language: pt-BR
@@ -56,9 +57,31 @@ jobs:
 
       - name: Assert composite action output
         shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           test -f composite-output.html
           grep -q 'Pergunta 1.' composite-output.html
           grep -q 'Revisão Técnica Automatizada' composite-output.html
           grep -q 'Background.' composite-output.html
+          grep -q 'Content-Security-Policy' composite-output.html
+          grep -q 'data-theme="light"' composite-output.html
+          ! grep -q 'cdn.tailwindcss.com' composite-output.html
+          ! grep -q 'data-injected' composite-output.html
+          ! grep -q '<div>Diagram.</div>' composite-output.html
+          ! grep -q '<pre>const x = 1;</pre>' composite-output.html
+
+      - name: Validate lifecycle resolver in generate mode
+        shell: bash
+        env:
+          INPUT_MODE: generate
+          INPUT_BASE_REF: main
+        run: |
+          set -euo pipefail
+          OUTPUT_FILE="$RUNNER_TEMP/lifecycle-output.txt"
+          bun "src/github/action.js" resolve \
+            --output "$OUTPUT_FILE" \
+            --context-file "$RUNNER_TEMP/lifecycle-context.json"
+          grep -q '^mode=generate$' "$OUTPUT_FILE"
+          grep -q '^should_generate=true$' "$OUTPUT_FILE"

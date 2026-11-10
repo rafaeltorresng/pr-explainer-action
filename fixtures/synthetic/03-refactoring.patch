@@ -1,0 +1,25 @@
+diff --git a/src/auth/token-validator.ts b/src/auth/token-validator.ts
+index e318210..9a1172f 100644
+--- a/src/auth/token-validator.ts
++++ b/src/auth/token-validator.ts
+@@ -10,12 +10,17 @@ export interface ValidationResult {
+ 
+-export function validateToken(token: string): ValidationResult {
+-  if (!token) return { valid: false, reason: 'missing' };
+-  if (token.length < 32) return { valid: false, reason: 'too_short' };
+-  if (!token.startsWith('tk_')) return { valid: false, reason: 'invalid_prefix' };
+-  return { valid: true };
++type CheckFn = (token: string) => string | null;
++const checks: CheckFn[] = [
++  (t) => (!t ? 'missing' : null),
++  (t) => (t.length < 32 ? 'too_short' : null),
++  (t) => (!t.startsWith('tk_') ? 'invalid_prefix' : null),
++];
++
++export function validateToken(token: string): ValidationResult {
++  for (const check of checks) {
++    const failure = check(token);
++    if (failure) return { valid: false, reason: failure };
++  }
++  return { valid: true };
+ }

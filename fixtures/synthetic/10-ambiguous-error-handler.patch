@@ -1,0 +1,16 @@
+diff --git a/src/client/http-handler.ts b/src/client/http-handler.ts
+index e556677..f889900 100644
+--- a/src/client/http-handler.ts
++++ b/src/client/http-handler.ts
+@@ -22,6 +22,12 @@ export function classifyHttpError(status: number, headers: Headers): ErrorClass
+   if (status === 429) {
+     const retryAfter = Number(headers.get('retry-after')) || 5;
+     return { retryable: true, delaySeconds: retryAfter, kind: 'rate_limited' };
+   }
++  if (status >= 400 && status < 500) {
++    // Client errors without usage token should not be retried automatically
++    return { retryable: false, delaySeconds: 0, kind: 'known_rejection' };
++  }
++  // Note: 5xx or network transport drops are classified as unknown
+   return { retryable: true, delaySeconds: 2, kind: 'unknown' };
+ }

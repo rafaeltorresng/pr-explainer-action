@@ -374,6 +374,12 @@
                         </div>
                     </section>
 
+                    <!-- EVIDENCE & VERIFIED FACTS -->
+                    {{EVIDENCE_SECTION}}
+
+                    <!-- INTERACTIVE SIMULATION -->
+                    {{SIMULATION_SECTION}}
+
                     <!-- DIAGRAMS -->
                     <section id="diagrams" class="scroll-mt-24 space-y-5">
                         <h2 class="section-title text-3xl sm:text-4xl font-serif text-white italic border-b border-gray-800 pb-3">3. Diagramas de Fluxo</h2>
@@ -687,6 +693,37 @@
             }
 
             updateQuizSidebar();
+        }
+
+        function selectSimulationScenario(idx) {
+            const section = document.getElementById('simulation-section');
+            if (!section) return;
+            const raw = section.getAttribute('data-scenarios');
+            if (!raw) return;
+
+            try {
+                const scenarios = JSON.parse(raw);
+                const sc = scenarios[idx];
+                if (!sc) return;
+
+                const allTabs = document.querySelectorAll('.sim-scenario-btn');
+                allTabs.forEach((tab, i) => {
+                    if (i === idx) {
+                        tab.setAttribute('aria-selected', 'true');
+                        tab.className = 'sim-scenario-btn px-3 py-1.5 rounded-lg text-xs font-mono border transition-all border-purple-500 bg-purple-950/40 text-purple-300';
+                    } else {
+                        tab.setAttribute('aria-selected', 'false');
+                        tab.className = 'sim-scenario-btn px-3 py-1.5 rounded-lg text-xs font-mono border transition-all border-gray-800 bg-[#0f0f0f] text-gray-400';
+                    }
+                });
+
+                const badge = document.getElementById('sim-outcome-badge');
+                const expl = document.getElementById('sim-explanation');
+                if (badge) badge.textContent = (sc.outcome && sc.outcome.action) || 'Evaluated';
+                if (expl) expl.textContent = sc.explanation || '';
+            } catch (e) {
+                console.error('Failed to parse simulation scenarios:', e);
+            }
         }
     </script>
 </body>

@@ -1,0 +1,33 @@
+diff --git a/src/cache/lru.ts b/src/cache/lru.ts
+new file mode 100644
+index 0000000..78a221f
+--- /dev/null
++++ b/src/cache/lru.ts
+@@ -0,0 +1,28 @@
++export class LRUCache<K, V> {
++  private capacity: number;
++  private values = new Map<K, V>();
++
++  constructor(capacity: number) {
++    if (capacity <= 0) throw new Error('Capacity must be positive');
++    this.capacity = capacity;
++  }
++
++  get(key: K): V | undefined {
++    if (!this.values.has(key)) return undefined;
++    const val = this.values.get(key)!;
++    this.values.delete(key);
++    this.values.set(key, val);
++    return val;
++  }
++
++  set(key: K, value: V): void {
++    if (this.values.has(key)) {
++      this.values.delete(key);
++    } else if (this.values.size >= this.capacity) {
++      const oldestKey = this.values.keys().next().value;
++      if (oldestKey !== undefined) this.values.delete(oldestKey);
++    }
++    this.values.set(key, value);
++  }
++}

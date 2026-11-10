@@ -1,0 +1,14 @@
+diff --git a/src/api/routes.ts b/src/api/routes.ts
+index b714201..8d91012 100644
+--- a/src/api/routes.ts
++++ b/src/api/routes.ts
+@@ -15,4 +15,10 @@ export function registerRoutes(app: ExpressApp) {
+-  app.get('/api/users', handleGetUsersV1);
++  app.get('/api/users', (req, res) => {
++    const apiVersion = req.headers['x-api-version'] || '1';
++    if (apiVersion === '2') {
++      return handleGetUsersV2(req, res);
++    }
++    return handleGetUsersV1(req, res);
++  });
+ }
