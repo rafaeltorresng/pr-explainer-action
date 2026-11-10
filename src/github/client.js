@@ -74,6 +74,10 @@ function createGitHubClient({
           'PATCH',
           `/repos/${encodeSegment(owner)}/${encodeSegment(repo)}/issues/comments/${encodeSegment(comment_id)}`,
           { body }
+        ),
+        deleteComment: ({ owner, repo, comment_id }) => request(
+          'DELETE',
+          `/repos/${encodeSegment(owner)}/${encodeSegment(repo)}/issues/comments/${encodeSegment(comment_id)}`
         )
       },
       repos: {
@@ -81,6 +85,9 @@ function createGitHubClient({
           'GET',
           `/repos/${encodeSegment(owner)}/${encodeSegment(repo)}/collaborators/${encodeSegment(username)}/permission`
         )
+      },
+      users: {
+        getAuthenticated: () => request('GET', '/user')
       },
       pulls: {
         get: ({ owner, repo, pull_number }) => request(

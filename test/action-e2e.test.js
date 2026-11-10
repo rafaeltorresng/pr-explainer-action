@@ -137,7 +137,7 @@ describe('runAction end-to-end with a mocked GitHub API', () => {
 
     const mock = await startMockGitHub((request) => {
       if (request.method === 'GET' && request.url.startsWith('/repos/acme/project/issues/17/comments')) {
-        return { body: [{ id: 303, body: `${COMMENT_MARKER}\n### PR Explainer AI\nPrevious analysis` }] };
+        return { body: [{ id: 303, body: `${COMMENT_MARKER}\n### PR Explainer AI\nPrevious analysis`, user: { login: 'github-actions[bot]', type: 'Bot' } }] };
       }
       if (request.method === 'PATCH' && request.url === '/repos/acme/project/issues/comments/303') {
         return { body: { id: 303 } };
@@ -287,11 +287,11 @@ describe('runAction end-to-end with a mocked GitHub API', () => {
         return { body: storedComment ? [storedComment] : [] };
       }
       if (request.method === 'POST' && request.url === '/repos/acme/project/issues/17/comments') {
-        storedComment = { id: 900, body: request.body.body };
+        storedComment = { id: 900, body: request.body.body, user: { login: 'github-actions[bot]', type: 'Bot' } };
         return { status: 201, body: storedComment };
       }
       if (request.method === 'PATCH' && request.url === '/repos/acme/project/issues/comments/900') {
-        storedComment = { id: 900, body: request.body.body };
+        storedComment = { id: 900, body: request.body.body, user: { login: 'github-actions[bot]', type: 'Bot' } };
         return { body: storedComment };
       }
       return { status: 404, body: { message: 'not found' } };

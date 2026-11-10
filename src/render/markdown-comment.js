@@ -1,6 +1,13 @@
 const { htmlToPlainText, looksLikeHtml } = require('../content/parser');
 
 const COMMENT_MARKER = '<!-- pr-explainer-comment -->';
+const SKIP_COMMENT_MARKER = '<!-- pr-explainer-skip -->';
+const DENIED_COMMENT_MARKER = '<!-- pr-explainer-denied -->';
+const EXPLAINER_COMMENT_MARKERS = [
+  COMMENT_MARKER,
+  SKIP_COMMENT_MARKER,
+  DENIED_COMMENT_MARKER
+];
 
 function sanitizeInlineText(value, maxLength = 700) {
   let text = value === null || value === undefined ? '' : String(value);
@@ -145,6 +152,9 @@ function generateOutdatedComment(previousBody, newHeadSha, language = 'en') {
 
 module.exports = {
   COMMENT_MARKER,
+  SKIP_COMMENT_MARKER,
+  DENIED_COMMENT_MARKER,
+  EXPLAINER_COMMENT_MARKERS,
   sanitizeInlineText,
   safeCodeSpan,
   safeHttpsUrl,
