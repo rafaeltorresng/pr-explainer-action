@@ -1,0 +1,44 @@
+diff --git a/src/telemetry/logger.ts b/src/telemetry/logger.ts
+index 1111111..2222222 100644
+--- a/src/telemetry/logger.ts
++++ b/src/telemetry/logger.ts
+@@ -10,3 +10,6 @@ export class Logger {
++  withTrace(traceId: string) {
++    return new ContextLogger(this, traceId);
++  }
+ }
+diff --git a/src/telemetry/tracer.ts b/src/telemetry/tracer.ts
+index 3333333..4444444 100644
+--- a/src/telemetry/tracer.ts
++++ b/src/telemetry/tracer.ts
+@@ -5,2 +5,5 @@ export function createSpan(name: string) {
++  const spanId = crypto.randomUUID();
++  return { name, spanId, start: Date.now() };
+ }
+diff --git a/src/http/middleware.ts b/src/http/middleware.ts
+index 5555555..6666666 100644
+--- a/src/http/middleware.ts
++++ b/src/http/middleware.ts
+@@ -8,2 +8,6 @@ export function traceMiddleware(req: Request, res: Response, next: NextFunction)
++  const traceId = req.headers['x-trace-id'] || crypto.randomUUID();
++  req.traceId = traceId;
++  res.setHeader('x-trace-id', traceId);
++  next();
+ }
+diff --git a/src/db/client.ts b/src/db/client.ts
+index 7777777..8888888 100644
+--- a/src/db/client.ts
++++ b/src/db/client.ts
+@@ -14,2 +14,5 @@ export async function query(sql: string, params: unknown[], traceId?: string) {
++  if (traceId) {
++    console.log(`[trace:${traceId}] SQL: ${sql}`);
++  }
+   return pool.query(sql, params);
+ }
+diff --git a/src/workers/queue.ts b/src/workers/queue.ts
+index 9999999..aaaaaaa 100644
+--- a/src/workers/queue.ts
++++ b/src/workers/queue.ts
+@@ -12,2 +12,4 @@ export async function enqueue(jobName: string, payload: unknown, traceId?: string
++  return queue.add({ jobName, payload, traceId });
+ }

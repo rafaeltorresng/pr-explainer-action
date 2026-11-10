@@ -1,0 +1,25 @@
+diff --git a/src/components/Modal.tsx b/src/components/Modal.tsx
+index 45a19b2..ce9014d 100644
+--- a/src/components/Modal.tsx
++++ b/src/components/Modal.tsx
+@@ -20,6 +20,18 @@ export function Modal({ isOpen, onClose, title, children }: ModalProps) {
++  const modalRef = useRef<HTMLDivElement>(null);
++
++  useEffect(() => {
++    if (!isOpen) return;
++    const handleKeyDown = (e: KeyboardEvent) => {
++      if (e.key === 'Escape') onClose();
++    };
++    window.addEventListener('keydown', handleKeyDown);
++    modalRef.current?.focus();
++    return () => window.removeEventListener('keydown', handleKeyDown);
++  }, [isOpen, onClose]);
++
+   if (!isOpen) return null;
+   return (
+-    <div className="modal-backdrop">
+-      <div className="modal-content">
++    <div className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-title">
++      <div className="modal-content" ref={modalRef} tabIndex={-1}>
++        <h2 id="modal-title">{title}</h2>
+         {children}
