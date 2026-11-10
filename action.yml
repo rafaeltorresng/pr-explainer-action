@@ -57,6 +57,10 @@ inputs:
     description: 'Maximum added plus deleted lines allowed before skipping generation.'
     required: false
     default: '15000'
+  max_output_tokens:
+    description: 'Maximum completion tokens requested from the provider. The effective value is capped per provider.'
+    required: false
+    default: '16384'
 
   # Language & Deliverables
   language:
@@ -132,6 +136,9 @@ outputs:
   tokens_used:
     description: 'Total tokens consumed.'
     value: ${{ steps.explain.outputs.tokens_used }}
+  cost_usd:
+    description: 'Provider-reported cost in USD, when the provider exposes it.'
+    value: ${{ steps.explain.outputs.cost_usd }}
   context_files_count:
     description: 'Number of selective context files inspected.'
     value: ${{ steps.explain.outputs.context_files_count }}
@@ -256,6 +263,7 @@ runs:
         MAX_CONTEXT_FILES: ${{ inputs.max_context_files }}
         MAX_CONTEXT_BYTES: ${{ inputs.max_context_bytes }}
         MAX_LINES: ${{ inputs.max_lines }}
+        MAX_OUTPUT_TOKENS: ${{ inputs.max_output_tokens }}
         PUBLISH_PAGES: ${{ inputs.publish_pages }}
         PAGES_OUTPUT_DIR: ${{ inputs.pages_output_dir }}
         PAGES_DEPLOYMENT_URL: ${{ inputs.pages_deployment_url }}

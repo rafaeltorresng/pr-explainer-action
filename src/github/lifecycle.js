@@ -1,10 +1,66 @@
-const { COMMENT_MARKER, generateOutdatedComment } = require('../render/markdown-comment');
+const {
+  COMMENT_MARKER,
+  SKIP_COMMENT_MARKER,
+  DENIED_COMMENT_MARKER,
+  EXPLAINER_COMMENT_MARKERS,
+  generateOutdatedComment
+} = require('../render/markdown-comment');
 
 function permissionAllowsExplain(permission) {
   return permission === 'admin' || permission === 'write' || permission === 'maintain';
 }
 
-async function findExistingExplainerComment(octokit, owner, repo, issueNumber, marker = COMMENT_MARKER) {
+/**
+ * Resolves the login that owns comments created by this Action. With the
+ * default GITHUB_TOKEN this is the GitHub Actions bot; with a PAT it is the
+ * token owner. Returning null makes callers fall back to bot-authored comments
+ * only, which fails closed for spoofed user comments.
+ */
+async function resolveAuthenticatedLogin(octokit) {
+  if (
+    !octokit ||
+    !octokit.rest ||
+    !octokit.rest.users ||
+    typeof octokit.rest.users.getAuthenticated !== 'function'
+  ) {
+    return null;
+  }
+
+  try {
+    const { data } = await octokit.rest.users.getAuthenticated();
+    return data && data.login ? String(data.login) : null;
+  } catch (error) {
+    console.warn(`Could not resolve authenticated GitHub login: ${error.message}`);
+    return null;
+  }
+}
+
+function containsExplainerMarker(body, markers) {
+  if (!body) return false;
+  const text = String(body);
+  return markers.some((marker) => text.includes(marker));
+}
+
+function isOwnComment(comment, authorLogin) {
+  const user = comment && comment.user;
+  if (!user) return false;
+  if (authorLogin) {
+    return String(user.login || '') === authorLogin;
+  }
+  // Without a resolvable identity, only accept bot comments. This prevents a
+  // third-party comment containing the marker from hijacking the update path.
+  return user.type === 'Bot';
+}
+
+async function listOwnExplainerComments(
+  octokit,
+  owner,
+  repo,
+  issueNumber,
+  { authorLogin = null } = {}
+) {
+  const matches = [];
+
   try {
     for (let page = 1; page <= 10; page += 1) {
       const { data: comments } = await octokit.rest.issues.listComments({
@@ -15,20 +71,102 @@ async function findExistingExplainerComment(octokit, owner, repo, issueNumber, m
         page
       });
 
-      const match = (comments || []).find((comment) => comment.body && comment.body.includes(marker));
-      if (match) {
-        return { id: match.id, body: match.body };
+      for (const comment of comments || []) {
+        if (!isOwnComment(comment, authorLogin)) continue;
+        if (containsExplainerMarker(comment.body, EXPLAINER_COMMENT_MARKERS)) {
+          matches.push({ id: comment.id, body: comment.body });
+        }
       }
       if (!Array.isArray(comments) || comments.length < 100) break;
     }
   } catch (error) {
     console.warn(`Could not list issue comments: ${error.message}`);
   }
-  return null;
+
+  return matches;
 }
 
-async function postOrUpdateComment(octokit, { owner, repo, issueNumber, body, marker = COMMENT_MARKER }) {
-  const existing = await findExistingExplainerComment(octokit, owner, repo, issueNumber, marker);
+async function findExistingExplainerComment(
+  octokit,
+  owner,
+  repo,
+  issueNumber,
+  marker = COMMENT_MARKER,
+  { authorLogin = null } = {}
+) {
+  const markers = Array.isArray(marker) ? marker : [marker];
+  const comments = await listOwnExplainerComments(
+    octokit,
+    owner,
+    repo,
+    issueNumber,
+    { authorLogin }
+  );
+  return comments.find((comment) => containsExplainerMarker(comment.body, markers)) || null;
+}
+
+async function deleteExplainerComment(octokit, owner, repo, commentId) {
+  if (
+    !octokit ||
+    !octokit.rest ||
+    !octokit.rest.issues ||
+    typeof octokit.rest.issues.deleteComment !== 'function'
+  ) {
+    return false;
+  }
+
+  try {
+    await octokit.rest.issues.deleteComment({
+      owner,
+      repo,
+      comment_id: commentId
+    });
+    console.log(`Removed superseded PR Explainer comment (id: ${commentId}).`);
+    return true;
+  } catch (error) {
+    console.warn(`Could not remove superseded comment ${commentId}: ${error.message}`);
+    return false;
+  }
+}
+
+async function postOrUpdateComment(
+  octokit,
+  { owner, repo, issueNumber, body, marker = COMMENT_MARKER, authorLogin = null }
+) {
+  const ownerLogin = authorLogin || await resolveAuthenticatedLogin(octokit);
+  const comments = await listOwnExplainerComments(
+    octokit,
+    owner,
+    repo,
+    issueNumber,
+    { authorLogin: ownerLogin }
+  );
+
+  const explanations = comments.filter((comment) =>
+    containsExplainerMarker(comment.body, [COMMENT_MARKER])
+  );
+  const statusNotices = comments.filter((comment) =>
+    containsExplainerMarker(comment.body, [SKIP_COMMENT_MARKER, DENIED_COMMENT_MARKER])
+  );
+  const isStatusNotice = marker === SKIP_COMMENT_MARKER || marker === DENIED_COMMENT_MARKER;
+
+  let existing = null;
+  let superseded = [];
+
+  if (isStatusNotice) {
+    // A skip/denied notice must never replace a valid explanation. Only another
+    // status notice is safe to update in place.
+    existing = statusNotices[0] || null;
+    superseded = statusNotices.slice(1);
+  } else if (explanations.length > 0) {
+    existing = explanations[0];
+    superseded = [...explanations.slice(1), ...statusNotices];
+  } else {
+    // No explanation exists yet: reuse the status comment so a later successful
+    // run does not leave a stale skip/denied notice behind.
+    existing = statusNotices[0] || null;
+    superseded = statusNotices.slice(1);
+  }
 
   if (existing) {
     console.log(`Updating existing PR Explainer comment (id: ${existing.id})...`);
@@ -38,6 +176,9 @@ async function postOrUpdateComment(octokit, { owner, repo, issueNumber, body, ma
       comment_id: existing.id,
       body
     });
+    for (const comment of superseded) {
+      await deleteExplainerComment(octokit, owner, repo, comment.id);
+    }
     return { action: 'updated', commentId: existing.id };
   }
 
@@ -51,8 +192,19 @@ async function postOrUpdateComment(octokit, { owner, repo, issueNumber, body, ma
   return { action: 'created', commentId: created.id };
 }
 
-async function markCommentOutdated(octokit, { owner, repo, issueNumber, newHeadSha, language = 'en' }) {
-  const existing = await findExistingExplainerComment(octokit, owner, repo, issueNumber);
+async function markCommentOutdated(
+  octokit,
+  { owner, repo, issueNumber, newHeadSha, language = 'en', authorLogin = null }
+) {
+  const ownerLogin = authorLogin || await resolveAuthenticatedLogin(octokit);
+  const existing = await findExistingExplainerComment(
+    octokit,
+    owner,
+    repo,
+    issueNumber,
+    COMMENT_MARKER,
+    { authorLogin: ownerLogin }
+  );
   if (!existing) {
     console.log('No existing PR Explainer comment found to mark outdated.');
     return false;
@@ -257,8 +409,10 @@ async function resolveLifecycleContext({ eventName, event, client, env = process
 
 module.exports = {
   COMMENT_MARKER,
+  EXPLAINER_COMMENT_MARKERS,
   LIFECYCLE_MODES,
   permissionAllowsExplain,
+  resolveAuthenticatedLogin,
   findExistingExplainerComment,
   postOrUpdateComment,
   markCommentOutdated,

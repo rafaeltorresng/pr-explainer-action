@@ -106,8 +106,12 @@ describe('idempotent comment management', () => {
         issues: {
           listComments: async () => ({
             data: [
-              { id: 101, body: 'regular user comment' },
-              { id: 303, body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nOld content' }
+              { id: 101, body: 'regular user comment', user: { login: 'outsider', type: 'User' } },
+              {
+                id: 303,
+                body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nOld content',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              }
             ]
           }),
           updateComment: async ({ comment_id, body }) => {
@@ -136,6 +140,124 @@ describe('idempotent comment management', () => {
     expect(createCalled).toBe(false);
   });
 
+  test('ignores marker text authored by another user and creates a separate comment', async () => {
+    let created = false;
+    let updated = false;
+
+    const mockOctokit = {
+      rest: {
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 999,
+                body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nSpoofed by a contributor',
+                user: { login: 'contributor', type: 'User' }
+              }
+            ]
+          }),
+          updateComment: async () => {
+            updated = true;
+            return { data: {} };
+          },
+          createComment: async () => {
+            created = true;
+            return { data: { id: 1000 } };
+          }
+        }
+      }
+    };
+
+    const res = await postOrUpdateComment(mockOctokit, {
+      owner: 'o',
+      repo: 'r',
+      issueNumber: 42,
+      body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nTrusted content'
+    });
+
+    expect(res.action).toBe('created');
+    expect(res.commentId).toBe(1000);
+    expect(created).toBe(true);
+    expect(updated).toBe(false);
+  });
+
+  test('updates comments owned by the authenticated PAT user', async () => {
+    let updatedId = null;
+
+    const mockOctokit = {
+      rest: {
+        users: {
+          getAuthenticated: async () => ({ data: { login: 'automation-user' } })
+        },
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 555,
+                body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nOld content',
+                user: { login: 'automation-user', type: 'User' }
+              }
+            ]
+          }),
+          updateComment: async ({ comment_id }) => {
+            updatedId = comment_id;
+            return { data: { id: comment_id } };
+          },
+          createComment: async () => {
+            throw new Error('should not create a duplicate');
+          }
+        }
+      }
+    };
+
+    const res = await postOrUpdateComment(mockOctokit, {
+      owner: 'o',
+      repo: 'r',
+      issueNumber: 42,
+      body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nUpdated content'
+    });
+
+    expect(res.action).toBe('updated');
+    expect(updatedId).toBe(555);
+  });
+
+  test('replaces a previous skip comment instead of leaving stale status output', async () => {
+    let updatedId = null;
+    let updatedBody = null;
+
+    const mockOctokit = {
+      rest: {
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 777,
+                body: '<!-- pr-explainer-skip -->\n### PR Explainer AI\nSkipped: too large',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              }
+            ]
+          }),
+          updateComment: async ({ comment_id, body }) => {
+            updatedId = comment_id;
+            updatedBody = body;
+            return { data: { id: comment_id } };
+          }
+        }
+      }
+    };
+
+    const res = await postOrUpdateComment(mockOctokit, {
+      owner: 'o',
+      repo: 'r',
+      issueNumber: 42,
+      body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nFull explanation'
+    });
+
+    expect(res.action).toBe('updated');
+    expect(updatedId).toBe(777);
+    expect(updatedBody).toContain('Full explanation');
+  });
+
   test('markCommentOutdated prefixes warning without re-running inference', async () => {
     let updatedBody = null;
 
@@ -144,7 +266,11 @@ describe('idempotent comment management', () => {
         issues: {
           listComments: async () => ({
             data: [
-              { id: 404, body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nValid analysis' }
+              {
+                id: 404,
+                body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nValid analysis',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              }
             ]
           }),
           updateComment: async ({ body }) => {
@@ -167,6 +293,195 @@ describe('idempotent comment management', () => {
     expect(updatedBody).toContain('[!WARNING]');
     expect(updatedBody).toContain('abcdef1');
     expect(updatedBody).toContain('Valid analysis');
+  });
+
+  test('finds an outdated explanation even though the warning precedes its marker', async () => {
+    let updatedId = null;
+    let createCalled = false;
+
+    const outdatedBody = [
+      '> [!WARNING]',
+      '> **This explanation is outdated.** New commits were pushed.',
+      '',
+      '<!-- pr-explainer-comment -->',
+      '### PR Explainer AI',
+      'Previous analysis'
+    ].join('\n');
+
+    const mockOctokit = {
+      rest: {
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 808,
+                body: outdatedBody,
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              }
+            ]
+          }),
+          updateComment: async ({ comment_id }) => {
+            updatedId = comment_id;
+            return { data: { id: comment_id } };
+          },
+          createComment: async () => {
+            createCalled = true;
+            return { data: { id: 999 } };
+          }
+        }
+      }
+    };
+
+    const found = await findExistingExplainerComment(mockOctokit, 'o', 'r', 42);
+    expect(found).not.toBeNull();
+    expect(found.id).toBe(808);
+
+    const res = await postOrUpdateComment(mockOctokit, {
+      owner: 'o',
+      repo: 'r',
+      issueNumber: 42,
+      body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nRefreshed analysis'
+    });
+
+    expect(res.action).toBe('updated');
+    expect(updatedId).toBe(808);
+    expect(createCalled).toBe(false);
+  });
+
+  test('a skip notice never overwrites an existing explanation', async () => {
+    let createBody = null;
+    let updateCalled = false;
+
+    const mockOctokit = {
+      rest: {
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 606,
+                body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nValid explanation',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              }
+            ]
+          }),
+          updateComment: async () => {
+            updateCalled = true;
+            return { data: {} };
+          },
+          createComment: async ({ body }) => {
+            createBody = body;
+            return { data: { id: 707 } };
+          }
+        }
+      }
+    };
+
+    const res = await postOrUpdateComment(mockOctokit, {
+      owner: 'o',
+      repo: 'r',
+      issueNumber: 42,
+      marker: '<!-- pr-explainer-skip -->',
+      body: '<!-- pr-explainer-skip -->\n### PR Explainer AI\nSkipped: diff too large'
+    });
+
+    expect(res.action).toBe('created');
+    expect(res.commentId).toBe(707);
+    expect(createBody).toContain('Skipped: diff too large');
+    expect(updateCalled).toBe(false);
+  });
+
+  test('a full explanation replaces the status comment and removes stale notices', async () => {
+    let updatedId = null;
+    const deletedIds = [];
+
+    const mockOctokit = {
+      rest: {
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 505,
+                body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nOld explanation',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              },
+              {
+                id: 506,
+                body: '<!-- pr-explainer-skip -->\n### PR Explainer AI\nSkipped: diff too large',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              }
+            ]
+          }),
+          updateComment: async ({ comment_id }) => {
+            updatedId = comment_id;
+            return { data: { id: comment_id } };
+          },
+          createComment: async () => {
+            throw new Error('should not create a duplicate');
+          },
+          deleteComment: async ({ comment_id }) => {
+            deletedIds.push(comment_id);
+            return { data: {} };
+          }
+        }
+      }
+    };
+
+    const res = await postOrUpdateComment(mockOctokit, {
+      owner: 'o',
+      repo: 'r',
+      issueNumber: 42,
+      body: '<!-- pr-explainer-comment -->\n### PR Explainer AI\nNew full explanation'
+    });
+
+    expect(res.action).toBe('updated');
+    expect(updatedId).toBe(505);
+    expect(deletedIds).toEqual([506]);
+  });
+
+  test('deletes duplicate status notices when updating the surviving one', async () => {
+    let updatedId = null;
+    const deletedIds = [];
+
+    const mockOctokit = {
+      rest: {
+        issues: {
+          listComments: async () => ({
+            data: [
+              {
+                id: 901,
+                body: '<!-- pr-explainer-denied -->\n### PR Explainer AI\nDenied',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              },
+              {
+                id: 902,
+                body: '<!-- pr-explainer-skip -->\n### PR Explainer AI\nSkipped',
+                user: { login: 'github-actions[bot]', type: 'Bot' }
+              }
+            ]
+          }),
+          updateComment: async ({ comment_id }) => {
+            updatedId = comment_id;
+            return { data: { id: comment_id } };
+          },
+          deleteComment: async ({ comment_id }) => {
+            deletedIds.push(comment_id);
+            return { data: {} };
+          }
+        }
+      }
+    };
+
+    const res = await postOrUpdateComment(mockOctokit, {
+      owner: 'o',
+      repo: 'r',
+      issueNumber: 42,
+      marker: '<!-- pr-explainer-skip -->',
+      body: '<!-- pr-explainer-skip -->\n### PR Explainer AI\nSkipped again'
+    });
+
+    expect(res.action).toBe('updated');
+    expect(updatedId).toBe(901);
+    expect(deletedIds).toEqual([902]);
   });
 });
 

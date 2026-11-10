@@ -14,14 +14,19 @@ const I18N = {
     authorIntent: 'Author Stated Intent',
     unverifiedUnknowns: 'Uncertainties & External Assumptions',
     walkthroughHeading: 'Behavioral Walkthrough',
+    simulationKicker: 'Interactive Simulation',
     simulationHeading: 'Interactive Scenario Explorer',
     simulationSubtitle: 'Test how inputs are classified and what actions the code triggers.',
     simulationRuleLabel: 'Governing Rule',
     simulationResultLabel: 'Evaluated Outcome',
+    simulationEvaluatedFallback: 'Evaluated',
+    simulationScenarioFallback: 'Scenario',
     diagramsHeading: 'Data Flow & State Transitions',
     limitationsHeading: 'Limitations & Unknowns',
     quizHeading: 'Test Your Understanding',
     quizQuestionLabel: 'Question',
+    quizQuestionSingular: 'question',
+    quizQuestionPlural: 'questions',
     quizScoreLabel: 'Score',
     quizReset: 'Reset',
     quizSelect: 'Select',
@@ -53,14 +58,19 @@ const I18N = {
     authorIntent: 'Intenção Declarada pelo Autor',
     unverifiedUnknowns: 'Incertezas & Premissas Externas',
     walkthroughHeading: 'Walkthrough de Comportamento',
+    simulationKicker: 'Simulação Interativa',
     simulationHeading: 'Explorador Interativo de Cenários',
     simulationSubtitle: 'Teste como as entradas são classificadas e quais ações o código executa.',
     simulationRuleLabel: 'Regra Aplicada',
     simulationResultLabel: 'Resultado Avaliado',
+    simulationEvaluatedFallback: 'Avaliado',
+    simulationScenarioFallback: 'Cenário',
     diagramsHeading: 'Fluxo de Dados & Estados',
     limitationsHeading: 'Limitações & Omissões',
     quizHeading: 'Teste seu Entendimento',
     quizQuestionLabel: 'Pergunta',
+    quizQuestionSingular: 'pergunta',
+    quizQuestionPlural: 'perguntas',
     quizScoreLabel: 'Pontuação',
     quizReset: 'Reiniciar',
     quizSelect: 'Selecionar',
@@ -105,6 +115,13 @@ function renderList(items) {
 
 function renderSectionHeading(title, className = '') {
   return `<h2 class="section-title ${className}"><span class="section-dot" aria-hidden="true"></span>${escapeHtml(title)}</h2>`;
+}
+
+function formatKeyLines(value) {
+  const text = String(value === null || value === undefined ? '' : value).trim();
+  if (!text) return '';
+  if (/^\d+(?:\s*[-–]\s*\d+)?$/.test(text)) return `L${text}`;
+  return text;
 }
 
 function renderEvidenceSection(evidence, language) {
@@ -169,7 +186,7 @@ function renderSimulationSection(simulation, language) {
   return `
     <section class="card" id="simulation-section" data-scenarios="${scenariosJson}">
       <div class="section-heading-group">
-        <span class="kicker">Interactive Simulation</span>
+        <span class="kicker">${escapeHtml(i18n.simulationKicker)}</span>
         ${renderSectionHeading(value.title || i18n.simulationHeading)}
         <p class="section-subtitle">${escapeHtml(value.description || i18n.simulationSubtitle)}</p>
       </div>
@@ -178,13 +195,16 @@ function renderSimulationSection(simulation, language) {
       <div class="sim-tabs" role="tablist">
         ${safeScenarios.map((scenario, index) => `
           <button type="button" class="sim-tab${index === 0 ? ' active' : ''}" data-sim-index="${index}" role="tab" aria-selected="${index === 0 ? 'true' : 'false'}">
-            ${escapeHtml(scenario.label || `Scenario ${index + 1}`)}
+            ${escapeHtml(scenario.label || `${i18n.simulationScenarioFallback} ${index + 1}`)}
           </button>`).join('')}
       </div>
       <div class="sim-result">
         <div class="sim-result-top">
           <span class="sim-result-label">${escapeHtml(i18n.simulationResultLabel)}</span>
-          <span class="sim-badge" id="sim-outcome-badge">${escapeHtml(first.outcome.action || 'Evaluated')}</span>
+          <span class="sim-outcome-meta">
+            <span class="sim-badge" id="sim-outcome-badge">${escapeHtml(first.outcome.action || i18n.simulationEvaluatedFallback)}</span>
+            <span class="sim-status" id="sim-outcome-status"${first.outcome.status ? '' : ' hidden'}>${escapeHtml(first.outcome.status)}</span>
+          </span>
         </div>
         <p id="sim-explanation">${escapeHtml(first.explanation)}</p>
       </div>
@@ -259,7 +279,7 @@ function renderWalkthroughSection(walkthrough, legacyCodeWalkthrough, language) 
                     <div class="walkthrough-file">
                       <div class="file-header">
                         <span class="file-path">${escapeHtml(entry.path || '')}</span>
-                        ${entry.keyLines ? `<span class="key-lines">L${escapeHtml(entry.keyLines)}</span>` : ''}
+                        ${entry.keyLines ? `<span class="key-lines">${escapeHtml(formatKeyLines(entry.keyLines))}</span>` : ''}
                       </div>
                       ${entry.role ? `<div class="file-role">${escapeHtml(entry.role)}</div>` : ''}
                       ${entry.summary ? `<p class="file-summary">${escapeHtml(entry.summary)}</p>` : ''}
@@ -296,7 +316,7 @@ function renderQuizHtml(quiz, language) {
   let quizHtml = `
     <div class="quiz-meta">
       <span>${escapeHtml(i18n.quizScoreLabel)}: <strong id="quiz-score-badge">0</strong> / ${questionTotal}</span>
-      <span>${questionTotal} ${questionTotal === 1 ? 'question' : 'questions'}</span>
+      <span>${questionTotal} ${escapeHtml(questionTotal === 1 ? i18n.quizQuestionSingular : i18n.quizQuestionPlural)}</span>
     </div>`;
 
   questions.forEach((question, questionIndex) => {
@@ -421,8 +441,7 @@ function renderEditorialDocument({
     'img-src data:',
     "base-uri 'none'",
     "form-action 'none'",
-    "object-src 'none'",
-    "frame-ancestors 'none'"
+    "object-src 'none'"
   ].join('; ');
 
   return `<!DOCTYPE html>
@@ -660,6 +679,19 @@ function renderEditorialDocument({
       font-size: 11px;
       font-weight: 700;
     }
+    html[data-theme="dark"] .sim-badge { color: #18181b; }
+    .sim-outcome-meta { display: inline-flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+    .sim-status {
+      border: 1px solid var(--border);
+      border-radius: 7px;
+      padding: 2px 8px;
+      background: var(--card);
+      color: var(--muted);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .sim-status[hidden] { display: none; }
     .sim-result p { margin: 0; }
     .diagram-list { display: grid; gap: 18px; }
     .diagram { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: color-mix(in srgb, var(--bg) 55%, var(--card)); }
@@ -680,13 +712,14 @@ function renderEditorialDocument({
     .diagram-node-desc { color: var(--muted); overflow-wrap: anywhere; }
     .diagram-arrow { align-self: center; color: var(--accent); font-weight: 800; }
     .walkthrough-list { display: grid; gap: 18px; }
+    .walkthrough-group { min-width: 0; }
     .walkthrough-title { margin: 0 0 4px; font-size: 1.05rem; }
     .walkthrough-description { margin: 0 0 12px; color: var(--muted); font-size: 0.9rem; }
-    .walkthrough-file { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: color-mix(in srgb, var(--bg) 55%, var(--card)); margin-bottom: 12px; }
+    .walkthrough-file { border: 1px solid var(--border); border-radius: 14px; padding: 16px; background: color-mix(in srgb, var(--bg) 55%, var(--card)); margin-bottom: 12px; min-width: 0; }
     .walkthrough-file:last-child { margin-bottom: 0; }
-    .file-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .file-path { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 800; color: var(--accent-strong); overflow-wrap: anywhere; }
-    .key-lines { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .file-header { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; }
+    .file-path { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; font-weight: 800; color: var(--accent-strong); overflow-wrap: anywhere; min-width: 0; }
+    .key-lines { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 11px; color: var(--muted); overflow-wrap: anywhere; max-width: 100%; }
     .file-role { margin-top: 4px; color: var(--muted); font-size: 0.82rem; font-style: italic; }
     .file-summary { margin: 8px 0; font-size: 0.9rem; }
     .code-block, .legacy-text {
@@ -749,6 +782,7 @@ function renderEditorialDocument({
     }
     .option:hover { border-color: var(--accent); }
     .option:disabled { cursor: default; opacity: 0.75; }
+    .option:disabled .option-hint { visibility: hidden; }
     .option.correct { border-color: var(--green); background: var(--green-soft); opacity: 1; }
     .option.incorrect { border-color: var(--red); background: var(--red-soft); opacity: 1; }
     .option-hint { color: var(--accent-strong); font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 10px; opacity: 0; }
@@ -769,6 +803,9 @@ function renderEditorialDocument({
       .hero-top { flex-direction: column; }
       .meta-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .evidence-grid { grid-template-columns: 1fr; }
+      .diagram-flow { flex-direction: column; }
+      .diagram-node { max-width: none; width: 100%; }
+      .diagram-arrow { transform: rotate(90deg); }
     }
     @media (prefers-reduced-motion: reduce) {
       html { scroll-behavior: auto; }
@@ -919,6 +956,8 @@ function renderEditorialDocument({
 
         var tabs = simulationSection.querySelectorAll('[data-sim-index]');
         var badge = document.getElementById('sim-outcome-badge');
+        var fallbackOutcome = badge ? badge.textContent : '';
+        var statusBadge = document.getElementById('sim-outcome-status');
         var explanation = document.getElementById('sim-explanation');
 
         tabs.forEach(function (tab) {
@@ -933,7 +972,12 @@ function renderEditorialDocument({
               candidate.setAttribute('aria-selected', active ? 'true' : 'false');
             });
 
-            if (badge) badge.textContent = (scenario.outcome && scenario.outcome.action) || 'Evaluated';
+            if (badge) badge.textContent = (scenario.outcome && scenario.outcome.action) || fallbackOutcome;
+            if (statusBadge) {
+              var statusText = (scenario.outcome && scenario.outcome.status) || '';
+              statusBadge.textContent = statusText;
+              statusBadge.hidden = statusText === '';
+            }
             if (explanation) explanation.textContent = scenario.explanation || '';
           });
         });
@@ -946,6 +990,7 @@ function renderEditorialDocument({
 
 module.exports = {
   I18N,
+  formatKeyLines,
   renderEvidenceSection,
   renderSimulationSection,
   renderVisualizations,

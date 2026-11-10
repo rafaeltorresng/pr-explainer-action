@@ -7,8 +7,10 @@ const {
   markCommentOutdated
 } = require('./lifecycle');
 
-const SKIP_MARKER = '<!-- pr-explainer-skip -->';
-const DENIED_MARKER = '<!-- pr-explainer-denied -->';
+const {
+  SKIP_COMMENT_MARKER: SKIP_MARKER,
+  DENIED_COMMENT_MARKER: DENIED_MARKER
+} = require('../render/markdown-comment');
 
 function parseArgs(argv) {
   const args = { _: [] };

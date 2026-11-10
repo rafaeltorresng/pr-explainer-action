@@ -75,7 +75,8 @@ async function callChatCompletions({
   systemInstruction,
   userPrompt,
   timeoutMs = FETCH_TIMEOUT_MS,
-  maxRetries = MAX_RETRIES
+  maxRetries = MAX_RETRIES,
+  maxOutputTokens = null
 }) {
   const url = `${apiBaseUrl.replace(/\/+$/, '')}/chat/completions`;
   const headers = {
@@ -97,6 +98,11 @@ async function callChatCompletions({
     temperature: 0.1,
     response_format: { type: 'json_object' }
   };
+
+  const outputLimit = Number(maxOutputTokens);
+  if (Number.isFinite(outputLimit) && outputLimit > 0) {
+    payload.max_tokens = Math.floor(outputLimit);
+  }
 
   let lastError;
   let retryDelayMs = null;
@@ -184,7 +190,8 @@ async function callAnthropicMessages({
   systemInstruction,
   userPrompt,
   timeoutMs = FETCH_TIMEOUT_MS,
-  maxRetries = MAX_RETRIES
+  maxRetries = MAX_RETRIES,
+  maxOutputTokens = 4096
 }) {
   const url = `${apiBaseUrl.replace(/\/+$/, '')}/messages`;
   const headers = {
@@ -199,7 +206,7 @@ async function callAnthropicMessages({
     messages: [
       { role: 'user', content: userPrompt }
     ],
-    max_tokens: 4096,
+    max_tokens: Math.max(1, Math.floor(Number(maxOutputTokens) || 4096)),
     temperature: 0.1
   };
 
@@ -265,7 +272,7 @@ async function callAnthropicMessages({
         rawContent,
         usage,
         nativeCost: null,
-        finishReason: data.stop_reason || 'stop',
+        finishReason: data.stop_reason === 'max_tokens' ? 'length' : (data.stop_reason || 'stop'),
         attempt
       };
     } catch (err) {
@@ -289,7 +296,8 @@ async function callProvider({
   systemInstruction,
   userPrompt,
   timeoutMs = FETCH_TIMEOUT_MS,
-  maxRetries = MAX_RETRIES
+  maxRetries = MAX_RETRIES,
+  maxOutputTokens = null
 }) {
   if (providerMeta && providerMeta.apiType === 'anthropic_messages') {
     return callAnthropicMessages({
@@ -299,7 +307,8 @@ async function callProvider({
       systemInstruction,
       userPrompt,
       timeoutMs,
-      maxRetries
+      maxRetries,
+      maxOutputTokens
     });
   }
 
@@ -311,7 +320,8 @@ async function callProvider({
     systemInstruction,
     userPrompt,
     timeoutMs,
-    maxRetries
+    maxRetries,
+    maxOutputTokens
   });
 }
 

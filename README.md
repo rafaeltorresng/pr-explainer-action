@@ -95,8 +95,11 @@ jobs:
         with:
           ai_provider: featherless
           ai_api_key: ${{ secrets.FEATHERLESS_API_KEY }}
-          ai_model: meta-llama/Meta-Llama-3.1-8B-Instruct
+          # Default and recommended for evidence-heavy reviews:
+          ai_model: deepseek-ai/DeepSeek-V4.1-Flash
 ```
+
+> **Model note:** `deepseek-ai/DeepSeek-V4.1-Flash` is the default Featherless model. It produced the most faithful explanations in validation, including cases where it contradicted misleading PR descriptions. On OpenRouter, the equivalent identifier is `deepseek/deepseek-v4.1-flash`; availability and pricing are controlled by the provider.
 
 #### Google Gemini
 ```yaml
@@ -136,6 +139,7 @@ jobs:
 | `max_context_files` | `2` | Maximum number of additional repository files to read. |
 | `max_context_bytes` | `8192` | Maximum total bytes of additional context (8 KB). |
 | `max_lines` | `15000` | Post a skip notice instead of generating when the diff exceeds this number of changed lines. |
+| `max_output_tokens` | `16384` | Maximum completion tokens requested from the provider. The effective value is capped per provider (Anthropic and Gemini: 8192). A response truncated at the cap is retried once before the run fails. |
 | `comment_on_pr` | `true` | Post/update an idempotent Markdown comment on the pull request. |
 | `publish_pages` | `false` | Prepare a local `pages-dist` directory for later publication. Does not deploy. |
 | `pages_output_dir` | `pages-dist` | Directory used when `publish_pages` is enabled. |
@@ -159,6 +163,7 @@ jobs:
 | `provider_used` | Provider that handled the request. |
 | `model_used` | Model identifier used. |
 | `tokens_used` | Total prompt + completion tokens used. |
+| `cost_usd` | Provider-reported cost in USD, when the provider exposes it; empty otherwise. Retries are included when the provider reports them. |
 | `context_files_count` | Number of selective context files inspected. |
 | `artifact_name` | Name of the uploaded artifact. |
 | `markdown_output_file` | File path of the generated Markdown summary. |
@@ -199,8 +204,8 @@ flowchart TD
 
 1. **Untrusted Data Boundary**: Diff content, author descriptions, and model output are untrusted. Model HTML is converted to plain text, and every rendered field is escaped. Reports use a nonce-based CSP, `default-src 'none'`, and no external scripts, styles, or fonts.
 2. **Context Safety**: Referenced files are resolved from the exact analyzed commit with `git cat-file`. Path traversal, absolute paths, symlinks, submodules, binary blobs, sensitive filenames, and files above the context budget are rejected. The mutable workspace is used only when no commit SHA is available.
-3. **Comment Safety**: Markdown control characters, mentions, URLs, and link syntax from model text are neutralized before posting.
-4. **Resilience**: Transient AI-provider errors (429, 500, 502, 503, 504) are retried with exponential backoff and jitter, respecting `Retry-After`. Permanent errors (400, 401, 403, 404) fail fast.
+3. **Comment Safety**: Markdown control characters, mentions, URLs, and link syntax from model text are neutralized before posting. The explanation and skip/denied status notices use separate markers, so a notice never overwrites a valid explanation; an update is applied only to a comment authored by the authenticated token owner (or, when the identity cannot be resolved, a bot-authored comment). A marker inside a third-party comment cannot hijack the update path.
+4. **Resilience**: Transient AI-provider errors (429, 500, 502, 503, 504) are retried with exponential backoff and jitter, respecting `Retry-After`. Permanent errors (400, 401, 403, 404) fail fast. Output is capped per provider; a `finish_reason: length` response is retried once at the configured limit before the run fails with an explicit truncation error.
 
 ---
 
