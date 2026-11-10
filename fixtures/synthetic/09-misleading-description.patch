@@ -1,0 +1,9 @@
+diff --git a/src/cli/deploy.ts b/src/cli/deploy.ts
+index b001122..c334455 100644
+--- a/src/cli/deploy.ts
++++ b/src/cli/deploy.ts
+@@ -35,3 +35,3 @@ export async function runDeployCli(args: string[]) {
+-  const dryRun = true;
++  const dryRun = args.includes('--dry-run');
+   if (dryRun) {
+     console.log('Dry-run enabled: skipping external API dispatch');
