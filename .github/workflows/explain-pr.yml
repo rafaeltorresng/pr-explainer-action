@@ -1,22 +1,37 @@
 name: explain-pr
 
 on:
-  pull_request:
-    types: [opened, reopened]
+  pull_request_target:
+    types: [opened, reopened, ready_for_review, synchronize, edited]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: pr-explainer-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
 
 jobs:
   explain:
+    if: |
+      github.event_name == 'pull_request_target' ||
+      (github.event_name == 'issue_comment' &&
+       github.event.issue.pull_request &&
+       (startsWith(github.event.comment.body, '/explain') ||
+        startsWith(github.event.comment.body, '/EXPLAIN') ||
+        startsWith(github.event.comment.body, '/Explain')))
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
+      issues: write
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      # Dogfood: run the Action from this PR's branch
+      # Dogfood: run the Action from the trusted base branch. pull_request_target
+      # must never check out or execute PR head code with repository secrets.
       - uses: ./
         with:
           openrouter_api_key: ${{ secrets.OPENROUTER_API_KEY }}
