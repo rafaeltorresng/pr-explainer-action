@@ -155,14 +155,16 @@ describe('artifact rendering', () => {
     expect(html).toContain('Pergunta 1.');
     expect(html).toContain('Selecionar');
     expect(html).toContain('Entrada / saída: $0.09 / $0.18 por 1M');
-    expect(html).toContain('diagram-panel');
-    expect(html).toContain('explanation-inner');
-    expect(html).toContain('quiz-answered');
-    expect(html).toContain('O estado anterior que este diff altera.');
+    expect(html).toContain('diagram-list');
+    expect(html).toContain('legacy-text');
+    expect(html).toContain('Background.');
     expect(html).toContain('aria-pressed="false"');
+    expect(html).toContain('Content-Security-Policy');
+    expect(html).toContain('data-theme="light"');
     expect(html).not.toContain('{{RATE_CHIP}}');
     expect(html).not.toContain('{{TOTAL_PRICE}}');
     expect(html).not.toContain('max-height: 300px');
+    expect(html).not.toContain('cdn.tailwindcss.com');
   });
 
   test('English artifact moves cost chips to the footer and keeps section intros', async () => {
@@ -186,7 +188,9 @@ describe('artifact rendering', () => {
     expect(costIndex).toBeGreaterThan(footerIndex);
     expect(html).toContain('What this change is reacting to.');
     expect(html).toContain('How data and control move through the change.');
-    expect(html).toContain('text-base font-sans flex items-center justify-between group');
+    expect(html).toContain('class="option"');
+    expect(html).toContain('Background.');
+    expect(html).toContain('Intuition.');
   });
 
   test('marks cost as n/a when the OpenRouter model is overridden', async () => {
@@ -454,5 +458,79 @@ describe('output write errors', () => {
         mockResponsePath: join(process.cwd(), 'mock.json')
       })
     ).rejects.toThrow(invalidPath);
+  });
+});
+
+describe('pages preparation output', () => {
+  const baseOptions = () => ({
+    diffFilePath: join(process.cwd(), 'sample.patch'),
+    languageInput: 'en',
+    apiKey: 'test',
+    commitSha: null,
+    mockResponsePath: join(process.cwd(), 'mock.json')
+  });
+
+  test('does not prepare or link Pages by default', async () => {
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-pages-'));
+
+    const result = await generateExplanation({
+      ...baseOptions(),
+      outputFilePath: join(tempDir, 'default.html')
+    });
+
+    expect(result.pagesFilePath).toBeNull();
+    expect(result.pagesUrl).toBeNull();
+    expect(result.markdownComment).not.toContain('Open Interactive Page (GitHub Pages)');
+    expect(result.markdownComment).not.toContain('Pages output prepared locally');
+  });
+
+  test('publish_pages prepares a local directory without claiming a URL', async () => {
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-pages-'));
+    const pagesDir = join(tempDir, 'pages-dist');
+
+    const result = await generateExplanation({
+      ...baseOptions(),
+      outputFilePath: join(tempDir, 'prepared.html'),
+      publishPages: true,
+      pagesOutputDir: pagesDir
+    });
+
+    expect(result.pagesUrl).toBeNull();
+    expect(result.pagesFilePath).toContain(join('pr-explains', 'pr-42', 'index.html'));
+    expect(existsSync(result.pagesFilePath)).toBe(true);
+    expect(result.markdownComment).toContain('Pages output prepared locally');
+    expect(result.markdownComment).not.toContain('Open Interactive Page (GitHub Pages)');
+  });
+
+  test('ignores a non-https Pages deployment URL', async () => {
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-pages-'));
+
+    const result = await generateExplanation({
+      ...baseOptions(),
+      outputFilePath: join(tempDir, 'insecure.html'),
+      pagesDeploymentUrl: 'http://org.github.io/repo/pr-explains/pr-42/'
+    });
+
+    expect(result.pagesUrl).toBeNull();
+    expect(result.markdownComment).not.toContain('Open Interactive Page (GitHub Pages)');
+  });
+
+  test('links an explicitly supplied https deployment URL', async () => {
+    process.env.GITHUB_EVENT_PATH = join(process.cwd(), 'event.json');
+    const tempDir = mkdtempSync(join(tmpdir(), 'pr-explainer-pages-'));
+
+    const result = await generateExplanation({
+      ...baseOptions(),
+      outputFilePath: join(tempDir, 'confirmed.html'),
+      pagesDeploymentUrl: 'https://org.github.io/repo/pr-explains/pr-42/'
+    });
+
+    expect(result.pagesUrl).toBe('https://org.github.io/repo/pr-explains/pr-42/');
+    expect(result.markdownComment).toContain(
+      '[Open Interactive Page (GitHub Pages)](https://org.github.io/repo/pr-explains/pr-42/)'
+    );
   });
 });
