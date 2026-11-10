@@ -1,44 +1,116 @@
 name: 'PR Explainer AI'
-description: 'Generate an interactive HTML explanation and quiz for pull requests with OpenRouter models.'
+description: 'Transform pull requests into an editorial, interactive technical learning experience with multi-provider AI.'
 author: 'Rafael Torres'
 branding:
   icon: 'book-open'
-  color: 'blue'
+  color: 'purple'
 
 inputs:
+  # Provider & Authentication
+  ai_provider:
+    description: 'AI provider to use. Supported values: openrouter, featherless, openai, anthropic, xai, gemini.'
+    required: false
+    default: 'openrouter'
+  ai_api_key:
+    description: 'Generic AI API key. Fallbacks to openrouter_api_key or provider-specific environment variables.'
+    required: false
+    default: ''
+  ai_model:
+    description: 'Model identifier. Overrides openrouter_model when provided.'
+    required: false
+    default: ''
+  ai_base_url:
+    description: 'Custom base URL endpoint override.'
+    required: false
+    default: ''
+
+  # Backward compatibility inputs
   openrouter_api_key:
-    description: 'OpenRouter API key used to call the LLM.'
-    required: true
+    description: 'OpenRouter API key used to call the LLM (legacy input, preserved for compatibility).'
+    required: false
+    default: ''
+  openrouter_model:
+    description: 'OpenRouter model identifier. Default: deepseek/deepseek-v4-flash.'
+    required: false
+    default: 'deepseek/deepseek-v4-flash'
+
+  # Lifecycle
+  mode:
+    description: 'Lifecycle mode: auto, generate, outdated, or skip. auto resolves pull_request and /explain events; generate is useful for CI/dry runs.'
+    required: false
+    default: 'auto'
+
+  # Context & Limits
+  enable_context_retrieval:
+    description: 'Whether to selectively retrieve referenced local scripts from the exact analyzed commit.'
+    required: false
+    default: 'true'
+  max_context_files:
+    description: 'Maximum number of local context files to inspect.'
+    required: false
+    default: '2'
+  max_context_bytes:
+    description: 'Maximum total bytes of selective context to read.'
+    required: false
+    default: '8192'
   max_lines:
     description: 'Maximum added plus deleted lines allowed before skipping generation.'
     required: false
     default: '15000'
-  openrouter_model:
-    description: 'OpenRouter model identifier. Users can override it with any model available in OpenRouter.'
-    required: false
-    default: 'deepseek/deepseek-v4-flash'
+
+  # Language & Deliverables
   language:
-    description: 'Language used for the generated prompt, HTML artifact, and PR comments. Supported values: en, pt-BR.'
+    description: 'Language used for the generated prompt, HTML artifact, and PR comments. Supported: en, pt-BR.'
     required: false
     default: 'en'
   output_file:
     description: 'Generated HTML filename.'
     required: false
     default: 'pr-explanation.html'
+  markdown_output_file:
+    description: 'Generated Markdown comment filename.'
+    required: false
+    default: 'pr-explanation.md'
   artifact_name:
     description: 'Artifact name used when uploading the generated HTML.'
     required: false
     default: 'pr-explanation-html'
+  retention_days:
+    description: 'Retention days for the uploaded HTML artifact.'
+    required: false
+    default: '14'
   base_ref:
     description: 'Base ref used to compute the diff. Optional outside pull_request events.'
     required: false
     default: ''
   comment_on_pr:
-    description: 'Whether to post a PR comment with artifact instructions.'
+    description: 'Whether to post or idempotently update a PR comment with Markdown summary and artifact link.'
     required: false
     default: 'true'
+  publish_pages:
+    description: 'Whether to prepare a local Pages directory artifact. This does not deploy, publish, or confirm a URL.'
+    required: false
+    default: 'false'
+  pages_output_dir:
+    description: 'Directory used when publish_pages is enabled.'
+    required: false
+    default: 'pages-dist'
+  pages_deployment_url:
+    description: 'Optional already-confirmed https URL of a Pages deployment. Only used to link the PR comment; the Action does not deploy.'
+    required: false
+    default: ''
+  github_token:
+    description: 'GitHub token with pull-requests: write permission for commenting (issues: write may also be required by some token configurations).'
+    required: false
+    default: ${{ github.token }}
 
 outputs:
+  lifecycle_mode:
+    description: 'Resolved lifecycle mode: generate, outdated, denied, or skip.'
+    value: ${{ steps.lifecycle.outputs.mode }}
+  pr_number:
+    description: 'Pull request number resolved from the event.'
+    value: ${{ steps.lifecycle.outputs.pr_number }}
   should_run:
     description: 'Whether generation ran after diff sizing.'
     value: ${{ steps.diff.outputs.should_run }}
@@ -48,6 +120,27 @@ outputs:
   artifact_name:
     description: 'Artifact name used by the upload step.'
     value: ${{ inputs.artifact_name }}
+  commit_sha:
+    description: 'Head commit SHA analyzed.'
+    value: ${{ steps.explain.outputs.commit_sha }}
+  provider_used:
+    description: 'AI provider used for explanation.'
+    value: ${{ steps.explain.outputs.provider_used }}
+  model_used:
+    description: 'Model identifier used for explanation.'
+    value: ${{ steps.explain.outputs.model_used }}
+  tokens_used:
+    description: 'Total tokens consumed.'
+    value: ${{ steps.explain.outputs.tokens_used }}
+  context_files_count:
+    description: 'Number of selective context files inspected.'
+    value: ${{ steps.explain.outputs.context_files_count }}
+  markdown_output_file:
+    description: 'Path to generated Markdown report file.'
+    value: ${{ steps.explain.outputs.markdown_output_file }}
+  pages_output_file:
+    description: 'Path to the prepared Pages index file, when publish_pages is enabled.'
+    value: ${{ steps.explain.outputs.pages_output_file }}
 
 runs:
   using: 'composite'
@@ -55,12 +148,30 @@ runs:
     - name: Setup Bun
       uses: oven-sh/setup-bun@v2
 
-    - name: Generate Git Diff
-      id: diff
+    - name: Resolve GitHub lifecycle
+      id: lifecycle
       shell: bash
       env:
+        INPUT_MODE: ${{ inputs.mode }}
         INPUT_BASE_REF: ${{ inputs.base_ref }}
-        GITHUB_BASE_REF: ${{ github.base_ref }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        INPUT_COMMENT_ON_PR: ${{ inputs.comment_on_pr }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+      run: |
+        set -euo pipefail
+        CONTEXT_FILE="$RUNNER_TEMP/pr-explainer-context.json"
+        bun "$GITHUB_ACTION_PATH/src/github/action.js" resolve \
+          --output "$GITHUB_OUTPUT" \
+          --context-file "$CONTEXT_FILE"
+
+    - name: Generate Git Diff
+      id: diff
+      if: steps.lifecycle.outputs.mode == 'generate'
+      shell: bash
+      env:
+        INPUT_BASE_REF: ${{ steps.lifecycle.outputs.base_ref }}
+        INPUT_HEAD_SHA: ${{ steps.lifecycle.outputs.head_sha }}
+        INPUT_PR_NUMBER: ${{ steps.lifecycle.outputs.pr_number }}
         INPUT_MAX_LINES: ${{ inputs.max_lines }}
       run: |
         set -euo pipefail
@@ -73,95 +184,149 @@ runs:
           BASE_REF="main"
         fi
 
-        git fetch --no-tags origin "$BASE_REF"
-        git diff "origin/$BASE_REF"...HEAD > pr_diff.patch
+        HEAD_SHA="${INPUT_HEAD_SHA:-}"
+        PR_NUMBER="${INPUT_PR_NUMBER:-0}"
+        DIFF_FILE="${RUNNER_TEMP}/pr-explainer-diff.patch"
 
-        LINES_CHANGED="$(git diff --numstat "origin/$BASE_REF"...HEAD | awk '{if ($1 != "-") ins+=$1; if ($2 != "-") del+=$2} END {print ins+del}')"
+        git fetch --no-tags origin "$BASE_REF"
+        if [ "$PR_NUMBER" != "0" ] && [ -n "$PR_NUMBER" ]; then
+          git fetch --no-tags origin "pull/${PR_NUMBER}/head"
+        fi
+        # The event head SHA is the exact commit we must analyze. Fetch it
+        # directly as well so a force-push race cannot leave it unavailable.
+        if [ -n "$HEAD_SHA" ] && [ "$HEAD_SHA" != "HEAD" ]; then
+          git fetch --no-tags origin "$HEAD_SHA" || true
+        fi
+
+        if [ -z "$HEAD_SHA" ] || [ "$HEAD_SHA" = "HEAD" ]; then
+          HEAD_SHA="$(git rev-parse HEAD)"
+        fi
+
+        if ! git cat-file -e "${HEAD_SHA}^{commit}" 2>/dev/null; then
+          echo "Unable to resolve analyzed head SHA ${HEAD_SHA}." >&2
+          exit 1
+        fi
+
+        LINES_CHANGED="$(git diff --numstat "origin/${BASE_REF}...${HEAD_SHA}" | awk '{if ($1 != "-") ins+=$1; if ($2 != "-") del+=$2} END {print ins+del}')"
         if [ -z "$LINES_CHANGED" ]; then
           LINES_CHANGED=0
         fi
+        if ! [[ "$LINES_CHANGED" =~ ^[0-9]+$ ]]; then
+          echo "Invalid changed-line count: ${LINES_CHANGED}" >&2
+          exit 1
+        fi
+        if ! [[ "$INPUT_MAX_LINES" =~ ^[0-9]+$ ]]; then
+          echo "Invalid max_lines input: ${INPUT_MAX_LINES}" >&2
+          exit 1
+        fi
 
         SHOULD_RUN=false
-        if [ "$LINES_CHANGED" -lt "$INPUT_MAX_LINES" ]; then
-          SHOULD_RUN=true
+        DIFF_EMPTY=false
+        if [ "$LINES_CHANGED" -le "$INPUT_MAX_LINES" ]; then
+          # Do not materialize an unbounded diff when generation will be skipped.
+          git diff "origin/${BASE_REF}...${HEAD_SHA}" > "$DIFF_FILE"
+          if [ -s "$DIFF_FILE" ]; then
+            SHOULD_RUN=true
+          else
+            DIFF_EMPTY=true
+          fi
         fi
 
         echo "lines_changed=$LINES_CHANGED" >> "$GITHUB_OUTPUT"
         echo "should_run=$SHOULD_RUN" >> "$GITHUB_OUTPUT"
+        echo "diff_empty=$DIFF_EMPTY" >> "$GITHUB_OUTPUT"
+        echo "diff_file=$DIFF_FILE" >> "$GITHUB_OUTPUT"
 
-    - name: Generate HTML explanation
-      if: steps.diff.outputs.should_run == 'true'
+    - name: Generate HTML and Markdown explanation
+      id: explain
+      if: steps.lifecycle.outputs.mode == 'generate' && steps.diff.outputs.should_run == 'true'
       shell: bash
       env:
+        AI_PROVIDER: ${{ inputs.ai_provider }}
+        AI_API_KEY: ${{ inputs.ai_api_key }}
+        AI_MODEL: ${{ inputs.ai_model }}
+        AI_BASE_URL: ${{ inputs.ai_base_url }}
         OPENROUTER_API_KEY: ${{ inputs.openrouter_api_key }}
         OPENROUTER_MODEL: ${{ inputs.openrouter_model }}
         EXPLAINER_LANGUAGE: ${{ inputs.language }}
         OUTPUT_FILE: ${{ inputs.output_file }}
+        MARKDOWN_OUTPUT_FILE: ${{ inputs.markdown_output_file }}
+        ARTIFACT_NAME: ${{ inputs.artifact_name }}
+        ENABLE_CONTEXT_RETRIEVAL: ${{ inputs.enable_context_retrieval }}
+        MAX_CONTEXT_FILES: ${{ inputs.max_context_files }}
+        MAX_CONTEXT_BYTES: ${{ inputs.max_context_bytes }}
+        MAX_LINES: ${{ inputs.max_lines }}
+        PUBLISH_PAGES: ${{ inputs.publish_pages }}
+        PAGES_OUTPUT_DIR: ${{ inputs.pages_output_dir }}
+        PAGES_DEPLOYMENT_URL: ${{ inputs.pages_deployment_url }}
+        PR_CONTEXT_FILE: ${{ steps.lifecycle.outputs.context_file }}
+        DIFF_FILE: ${{ steps.diff.outputs.diff_file }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
       run: |
         set -euo pipefail
-        bun "$GITHUB_ACTION_PATH/explain-pr.js" pr_diff.patch "$OUTPUT_FILE"
+        bun "$GITHUB_ACTION_PATH/explain-pr.js" "$DIFF_FILE" "$OUTPUT_FILE"
 
     - name: Upload HTML artifact
-      if: steps.diff.outputs.should_run == 'true'
+      if: steps.lifecycle.outputs.mode == 'generate' && steps.diff.outputs.should_run == 'true'
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.artifact_name }}
         path: ${{ inputs.output_file }}
-        retention-days: 14
+        retention-days: ${{ inputs.retention_days }}
 
-    - name: Comment PR with artifact link
-      if: github.event_name == 'pull_request' && inputs.comment_on_pr == 'true' && steps.diff.outputs.should_run == 'true'
-      uses: actions/github-script@v9
+    - name: Upload prepared Pages directory
+      if: steps.lifecycle.outputs.mode == 'generate' && steps.diff.outputs.should_run == 'true' && inputs.publish_pages == 'true'
+      uses: actions/upload-artifact@v7
       with:
-        github-token: ${{ github.token }}
-        script: |
-          const artifactName = '${{ inputs.artifact_name }}';
-          const language = '${{ inputs.language }}';
-          const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-          const copy = language === 'pt-BR'
-            ? {
-                title: '### PR Explainer AI',
-                generated: 'Explicação interativa gerada para este PR.',
-                artifact: `Artefato: \`${artifactName}\``,
-                openRun: `[Abrir execução](${runUrl})`
-              }
-            : {
-                title: '### PR Explainer AI',
-                generated: 'Interactive explanation generated for this PR.',
-                artifact: `Artifact: \`${artifactName}\``,
-                openRun: `[Open run](${runUrl})`
-              };
-          const body = [copy.title, '', copy.generated, '', copy.artifact, copy.openRun].join('\n');
+        name: ${{ inputs.artifact_name }}-pages
+        path: ${{ inputs.pages_output_dir }}
+        retention-days: ${{ inputs.retention_days }}
 
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.payload.pull_request.number,
-            body,
-          });
+    - name: Update PR comment
+      if: steps.lifecycle.outputs.mode == 'generate' && steps.diff.outputs.should_run == 'true' && inputs.comment_on_pr == 'true' && steps.lifecycle.outputs.pr_number != '0'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        PR_CONTEXT_FILE: ${{ steps.lifecycle.outputs.context_file }}
+        MARKDOWN_OUTPUT_FILE: ${{ inputs.markdown_output_file }}
+      run: |
+        set -euo pipefail
+        bun "$GITHUB_ACTION_PATH/src/github/action.js" comment \
+          --context-file "$PR_CONTEXT_FILE" \
+          --body-file "$MARKDOWN_OUTPUT_FILE"
+
+    - name: Mark existing explanation outdated
+      if: steps.lifecycle.outputs.mode == 'outdated' && inputs.comment_on_pr == 'true' && steps.lifecycle.outputs.pr_number != '0'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        PR_CONTEXT_FILE: ${{ steps.lifecycle.outputs.context_file }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+      run: |
+        set -euo pipefail
+        bun "$GITHUB_ACTION_PATH/src/github/action.js" outdated --context-file "$PR_CONTEXT_FILE"
 
     - name: Comment PR when skipped
-      if: github.event_name == 'pull_request' && inputs.comment_on_pr == 'true' && steps.diff.outputs.should_run == 'false'
-      uses: actions/github-script@v9
-      with:
-        github-token: ${{ github.token }}
-        script: |
-          const language = '${{ inputs.language }}';
-          const linesChanged = '${{ steps.diff.outputs.lines_changed }}';
-          const maxLines = '${{ inputs.max_lines }}';
-          const body = language === 'pt-BR'
-            ? [
-                '### PR Explainer AI',
-                `Ignorado: ${linesChanged} linhas alteradas excedem o limite ${maxLines}.`
-              ].join('\n')
-            : [
-                '### PR Explainer AI',
-                `Skipped: ${linesChanged} changed lines exceeds limit ${maxLines}.`
-              ].join('\n');
+      if: steps.lifecycle.outputs.mode == 'generate' && steps.diff.outputs.should_run == 'false' && inputs.comment_on_pr == 'true' && steps.lifecycle.outputs.pr_number != '0'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        PR_CONTEXT_FILE: ${{ steps.lifecycle.outputs.context_file }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+        LINES_CHANGED: ${{ steps.diff.outputs.lines_changed }}
+        MAX_LINES: ${{ inputs.max_lines }}
+        DIFF_EMPTY: ${{ steps.diff.outputs.diff_empty }}
+      run: |
+        set -euo pipefail
+        bun "$GITHUB_ACTION_PATH/src/github/action.js" skip --context-file "$PR_CONTEXT_FILE"
 
-          await github.rest.issues.createComment({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.payload.pull_request.number,
-            body,
-          });
+    - name: Comment when /explain is denied
+      if: steps.lifecycle.outputs.mode == 'denied' && inputs.comment_on_pr == 'true' && steps.lifecycle.outputs.pr_number != '0'
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        PR_CONTEXT_FILE: ${{ steps.lifecycle.outputs.context_file }}
+        INPUT_LANGUAGE: ${{ inputs.language }}
+      run: |
+        set -euo pipefail
+        bun "$GITHUB_ACTION_PATH/src/github/action.js" denied --context-file "$PR_CONTEXT_FILE"
