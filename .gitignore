@@ -4,3 +4,4 @@ pr-explanation-*.html
 pr-explanation-*.md
 pages-dist/
 composite-output.html
+.env
