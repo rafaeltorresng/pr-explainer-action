@@ -8,6 +8,7 @@ const {
   DEFAULT_MAX_LINES,
   DEFAULT_MAX_CONTEXT_FILES,
   DEFAULT_MAX_CONTEXT_BYTES,
+  DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_RETENTION_DAYS,
   normalizeProviderName,
   resolveConfig
@@ -104,7 +105,7 @@ function normalizeLanguage(input) {
 function readEventContext() {
   let prTitle = process.env.PR_TITLE || 'Code Changes';
   let prNumber = process.env.PR_NUMBER || '0';
-  let prBody = '';
+  let prBody = String(process.env.PR_BODY || '').trim().slice(0, 8000);
   let commitSha = process.env.PR_HEAD_SHA || process.env.GITHUB_SHA || 'HEAD';
   let repoOwner = '';
   let repoName = '';
@@ -392,6 +393,7 @@ async function generateExplanation({
   maxContextFiles,
   maxContextBytes,
   maxLines,
+  maxOutputTokens,
   publishPages,
   pagesOutputDir,
   pagesDeploymentUrl,
@@ -411,6 +413,7 @@ async function generateExplanation({
     maxContextFiles,
     maxContextBytes,
     maxLines,
+    maxOutputTokens,
     publishPages,
     pagesOutputDir,
     pagesDeploymentUrl
@@ -482,25 +485,56 @@ async function generateExplanation({
     usage = mockData.usage || usage;
     nativeCost = (mockData.usage && mockData.usage.cost) || null;
   } else {
-    const response = await callProvider({
-      provider: config.provider,
-      providerMeta: config.providerMeta,
-      apiBaseUrl: config.apiBaseUrl,
-      apiKey: config.apiKey,
-      model: config.model,
-      systemInstruction,
-      userPrompt,
-      timeoutMs: FETCH_TIMEOUT_MS,
-      maxRetries: MAX_RETRIES
-    });
+    const maxLengthRetries = 1;
+    let response = null;
+
+    for (let attempt = 0; attempt <= maxLengthRetries; attempt += 1) {
+      response = await callProvider({
+        provider: config.provider,
+        providerMeta: config.providerMeta,
+        apiBaseUrl: config.apiBaseUrl,
+        apiKey: config.apiKey,
+        model: config.model,
+        systemInstruction,
+        userPrompt,
+        timeoutMs: FETCH_TIMEOUT_MS,
+        maxRetries: MAX_RETRIES,
+        maxOutputTokens: config.maxOutputTokens
+      });
+
+      usage = {
+        prompt_tokens: Number(usage.prompt_tokens || 0) + Number(response.usage.prompt_tokens || 0),
+        completion_tokens: Number(usage.completion_tokens || 0) + Number(response.usage.completion_tokens || 0),
+        total_tokens: Number(usage.total_tokens || 0) + Number(response.usage.total_tokens || 0)
+      };
+      if (response.nativeCost !== null) {
+        nativeCost = Number(nativeCost || 0) + Number(response.nativeCost);
+      }
+
+      if (response.finishReason !== 'length') break;
+
+      if (attempt === maxLengthRetries) {
+        throw new Error(
+          `Model response was truncated at ${config.maxOutputTokens} completion tokens twice. ` +
+          'Increase max_output_tokens or reduce the diff/context size.'
+        );
+      }
+
+      console.warn(
+        `Model response hit the ${config.maxOutputTokens}-token completion limit. ` +
+        'Retrying once to avoid publishing a partial explanation...'
+      );
+    }
+
     rawContent = response.rawContent;
-    usage = response.usage;
-    nativeCost = response.nativeCost;
   }
 
   console.log(
     `AI response received successfully. (Prompt tokens: ${usage.prompt_tokens} | Completion tokens: ${usage.completion_tokens} | Total: ${usage.total_tokens})`
   );
+  if (nativeCost !== null) {
+    console.log(`Provider-reported cost: $${Number(nativeCost).toFixed(6)}`);
+  }
 
   const rawExplanation = parseModelContent(rawContent);
   validateExplanation(rawExplanation);
@@ -631,6 +665,7 @@ async function generateExplanation({
     markdownComment,
     quiz: normalizedQuiz,
     usage,
+    nativeCost,
     provider: config.provider,
     model: config.model,
     contextMetadata: contextResult,
@@ -660,6 +695,7 @@ async function main() {
       maxContextFiles: process.env.MAX_CONTEXT_FILES,
       maxContextBytes: process.env.MAX_CONTEXT_BYTES,
       maxLines: process.env.MAX_LINES,
+      maxOutputTokens: process.env.MAX_OUTPUT_TOKENS,
       publishPages: process.env.PUBLISH_PAGES === 'true',
       pagesOutputDir: process.env.PAGES_OUTPUT_DIR,
       pagesDeploymentUrl: process.env.PAGES_DEPLOYMENT_URL,
@@ -674,6 +710,7 @@ async function main() {
       appendFileSync(ghOutput, `provider_used=${result.provider}\n`);
       appendFileSync(ghOutput, `model_used=${result.model}\n`);
       appendFileSync(ghOutput, `tokens_used=${Number(result.usage.total_tokens) || 0}\n`);
+      appendFileSync(ghOutput, `cost_usd=${result.nativeCost === null ? '' : Number(result.nativeCost).toFixed(6)}\n`);
       appendFileSync(ghOutput, `context_files_count=${result.contextMetadata.retrievedFiles.length}\n`);
       appendFileSync(ghOutput, `markdown_output_file=${markdownOutputFilePath}\n`);
       if (result.pagesFilePath) {
@@ -703,6 +740,7 @@ module.exports = {
   normalizeLanguage,
   normalizeQuiz,
   parseModelContent,
+  readEventContext,
   renderQuizHtml,
   validateExplanation,
   // Evolved exports:

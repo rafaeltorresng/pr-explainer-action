@@ -12,6 +12,7 @@ const {
   normalizeLanguage,
   normalizeQuiz,
   parseModelContent,
+  readEventContext,
   validateExplanation
 } = require('./explain-pr.js');
 
@@ -93,6 +94,31 @@ describe('user prompt construction', () => {
 
     expect(englishPrompt).not.toContain('Pull Request description');
     expect(portuguesePrompt).not.toContain('descrição do Pull Request');
+  });
+
+  test('reads PR_BODY from the environment when no context file is present', () => {
+    const previous = {
+      title: process.env.PR_TITLE,
+      number: process.env.PR_NUMBER,
+      body: process.env.PR_BODY,
+      context: process.env.PR_CONTEXT_FILE,
+      event: process.env.GITHUB_EVENT_PATH
+    };
+
+    process.env.PR_TITLE = 'test: environment body';
+    process.env.PR_NUMBER = '77';
+    process.env.PR_BODY = 'Author description from PR_BODY';
+    delete process.env.PR_CONTEXT_FILE;
+    process.env.GITHUB_EVENT_PATH = '';
+
+    const context = readEventContext();
+    expect(context.prBody).toBe('Author description from PR_BODY');
+
+    for (const [key, value] of Object.entries(previous)) {
+      const envKey = { title: 'PR_TITLE', number: 'PR_NUMBER', body: 'PR_BODY', context: 'PR_CONTEXT_FILE', event: 'GITHUB_EVENT_PATH' }[key];
+      if (value === undefined) delete process.env[envKey];
+      else process.env[envKey] = value;
+    }
   });
 
   test('omits the description section when the PR body is only whitespace', () => {

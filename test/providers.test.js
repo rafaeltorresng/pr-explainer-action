@@ -28,6 +28,14 @@ describe('provider resolution & config precedence', () => {
     expect(() => resolveConfig({ AI_PROVIDER: 'unsupported-ai' })).toThrow(/unsupported ai provider/i);
   });
 
+  test('uses DeepSeek V4.1 Flash as the default Featherless model', () => {
+    const config = resolveConfig({
+      AI_PROVIDER: 'featherless',
+      FEATHERLESS_API_KEY: 'ft_test_123'
+    });
+    expect(config.model).toBe('deepseek-ai/DeepSeek-V4.1-Flash');
+  });
+
   test('resolves provider-specific api keys and models', () => {
     const featherlessConfig = resolveConfig({
       AI_PROVIDER: 'featherless',
@@ -61,6 +69,13 @@ describe('provider resolution & config precedence', () => {
       OPENAI_API_KEY: 'fallback_key'
     });
     expect(config.apiKey).toBe('override_key');
+  });
+
+  test('caps output tokens per provider and honors explicit overrides', () => {
+    expect(resolveConfig({}).maxOutputTokens).toBe(16384);
+    expect(resolveConfig({ AI_PROVIDER: 'anthropic' }).maxOutputTokens).toBe(8192);
+    expect(resolveConfig({ AI_PROVIDER: 'anthropic', MAX_OUTPUT_TOKENS: '12000' }).maxOutputTokens).toBe(8192);
+    expect(resolveConfig({ AI_PROVIDER: 'featherless', MAX_OUTPUT_TOKENS: '4096' }).maxOutputTokens).toBe(4096);
   });
 
   test('backward compatibility: accepts OPENROUTER_API_KEY and OPENROUTER_MODEL directly', () => {
@@ -123,7 +138,8 @@ describe('provider contract tests (mocked HTTP)', () => {
         systemInstruction: 'sys prompt',
         userPrompt: 'user prompt',
         timeoutMs: 5000,
-        maxRetries: 1
+        maxRetries: 1,
+        maxOutputTokens: 8192
       });
 
       expect(capturedUrl).toBe('https://api.featherless.ai/v1/chat/completions');
@@ -131,6 +147,7 @@ describe('provider contract tests (mocked HTTP)', () => {
       expect(capturedBody.model).toBe('meta-llama/test-model');
       expect(capturedBody.messages).toHaveLength(2);
       expect(capturedBody.response_format).toEqual({ type: 'json_object' });
+      expect(capturedBody.max_tokens).toBe(8192);
       expect(result.usage.total_tokens).toBe(40);
       expect(result.rawContent).toContain('summary');
     } finally {
@@ -210,6 +227,34 @@ describe('provider contract tests (mocked HTTP)', () => {
       expect(capturedBody.max_tokens).toBeGreaterThan(1000);
       expect(result.usage.total_tokens).toBe(130);
       expect(result.rawContent).toContain('claude test');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('normalizes Anthropic stop_reason max_tokens to finishReason length', async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({
+      status: 200,
+      ok: true,
+      headers: new Headers(),
+      text: async () => JSON.stringify({
+        content: [{ type: 'text', text: '{"partial":true}' }],
+        stop_reason: 'max_tokens',
+        usage: { input_tokens: 10, output_tokens: 5 }
+      })
+    });
+
+    try {
+      const result = await callAnthropicMessages({
+        apiBaseUrl: 'https://api.anthropic.com/v1',
+        apiKey: 'sk-ant-test',
+        model: 'claude-3-5-sonnet-20241022',
+        systemInstruction: 'sys',
+        userPrompt: 'usr'
+      });
+
+      expect(result.finishReason).toBe('length');
     } finally {
       globalThis.fetch = originalFetch;
     }

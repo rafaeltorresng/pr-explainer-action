@@ -4,42 +4,48 @@ const PROVIDERS = {
     name: 'OpenRouter',
     defaultBaseUrl: 'https://openrouter.ai/api/v1',
     defaultModel: 'deepseek/deepseek-v4-flash',
-    apiType: 'chat_completions'
+    apiType: 'chat_completions',
+    maxOutputTokensLimit: 16384
   },
   featherless: {
     id: 'featherless',
     name: 'Featherless',
     defaultBaseUrl: 'https://api.featherless.ai/v1',
-    defaultModel: 'meta-llama/Meta-Llama-3.1-8B-Instruct',
-    apiType: 'chat_completions'
+    defaultModel: 'deepseek-ai/DeepSeek-V4.1-Flash',
+    apiType: 'chat_completions',
+    maxOutputTokensLimit: 16384
   },
   openai: {
     id: 'openai',
     name: 'OpenAI',
     defaultBaseUrl: 'https://api.openai.com/v1',
     defaultModel: 'gpt-4o-mini',
-    apiType: 'chat_completions'
+    apiType: 'chat_completions',
+    maxOutputTokensLimit: 16384
   },
   anthropic: {
     id: 'anthropic',
     name: 'Anthropic',
     defaultBaseUrl: 'https://api.anthropic.com/v1',
     defaultModel: 'claude-3-5-sonnet-20241022',
-    apiType: 'anthropic_messages'
+    apiType: 'anthropic_messages',
+    maxOutputTokensLimit: 8192
   },
   xai: {
     id: 'xai',
     name: 'xAI',
     defaultBaseUrl: 'https://api.x.ai/v1',
     defaultModel: 'grok-beta',
-    apiType: 'chat_completions'
+    apiType: 'chat_completions',
+    maxOutputTokensLimit: 16384
   },
   gemini: {
     id: 'gemini',
     name: 'Google Gemini',
     defaultBaseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
     defaultModel: 'gemini-1.5-flash',
-    apiType: 'chat_completions'
+    apiType: 'chat_completions',
+    maxOutputTokensLimit: 8192
   }
 };
 
@@ -48,6 +54,7 @@ const DEFAULT_LANGUAGE = 'en';
 const DEFAULT_MAX_LINES = 15000;
 const DEFAULT_MAX_CONTEXT_FILES = 2;
 const DEFAULT_MAX_CONTEXT_BYTES = 8192; // 8 KB
+const DEFAULT_MAX_OUTPUT_TOKENS = 16384;
 const DEFAULT_RETENTION_DAYS = 14;
 
 function normalizeProviderName(raw) {
@@ -139,6 +146,14 @@ function resolveConfig(env = process.env, overrides = {}) {
     overrides.maxLines || env.INPUT_MAX_LINES || env.MAX_LINES,
     DEFAULT_MAX_LINES
   );
+  const maxOutputTokens = positiveNumber(
+    overrides.maxOutputTokens || env.INPUT_MAX_OUTPUT_TOKENS || env.MAX_OUTPUT_TOKENS,
+    DEFAULT_MAX_OUTPUT_TOKENS
+  );
+  const maxOutputTokensLimit = positiveNumber(
+    providerMeta.maxOutputTokensLimit,
+    DEFAULT_MAX_OUTPUT_TOKENS
+  );
 
   // Pages publication is opt-in and only prepares a directory. A URL is never
   // inferred; it must be supplied explicitly after a real deployment.
@@ -159,6 +174,7 @@ function resolveConfig(env = process.env, overrides = {}) {
     maxContextFiles: Math.max(1, Math.floor(maxContextFiles)),
     maxContextBytes: Math.max(512, Math.floor(maxContextBytes)),
     maxLines: Math.max(1, Math.floor(maxLines)),
+    maxOutputTokens: Math.max(256, Math.min(Math.floor(maxOutputTokens), Math.floor(maxOutputTokensLimit))),
     publishPages,
     pagesOutputDir: overrides.pagesOutputDir || env.PAGES_OUTPUT_DIR || 'pages-dist',
     pagesDeploymentUrl: overrides.pagesDeploymentUrl || env.PAGES_DEPLOYMENT_URL || '',
@@ -174,6 +190,7 @@ module.exports = {
   DEFAULT_MAX_LINES,
   DEFAULT_MAX_CONTEXT_FILES,
   DEFAULT_MAX_CONTEXT_BYTES,
+  DEFAULT_MAX_OUTPUT_TOKENS,
   DEFAULT_RETENTION_DAYS,
   normalizeProviderName,
   resolveConfig
