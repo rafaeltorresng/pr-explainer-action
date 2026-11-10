@@ -132,6 +132,23 @@ function repairTruncatedJson(text) {
   }
 }
 
+/**
+ * Some OpenAI-compatible endpoints drop only the opening root brace when JSON
+ * mode is enabled (observed with DeepSeek V4-Flash on Featherless). This is a
+ * narrow, unambiguous repair: the payload must start with a quoted key and end
+ * with a closing object brace. Partial or truncated JSON is still rejected.
+ */
+function repairMissingRootBrace(text) {
+  const trimmed = String(text || '').trim();
+  if (!trimmed.startsWith('"') || !trimmed.endsWith('}')) return null;
+
+  try {
+    return JSON.parse(`{${trimmed}`);
+  } catch {
+    return null;
+  }
+}
+
 function parseModelContent(rawContent) {
   const contentText = stripMarkdownFences(rawContent);
 
@@ -140,6 +157,12 @@ function parseModelContent(rawContent) {
   } catch (firstError) {
     console.warn(`JSON parse direto falhou: ${firstError.message}. Tentando repair...`);
     console.warn(`Raw response (primeiros 500 chars): ${contentText.substring(0, 500)}`);
+  }
+
+  const repairedRoot = repairMissingRootBrace(contentText);
+  if (repairedRoot !== null) {
+    console.warn('JSON repair: missing opening root brace restored.');
+    return repairedRoot;
   }
 
   const repaired = repairTruncatedJson(contentText);
@@ -361,6 +384,7 @@ module.exports = {
   normalizeDisplayText,
   normalizeCodeText,
   stripMarkdownFences,
+  repairMissingRootBrace,
   repairTruncatedJson,
   parseModelContent,
   validateExplanation,

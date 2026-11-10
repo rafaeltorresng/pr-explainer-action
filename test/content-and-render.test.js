@@ -102,6 +102,52 @@ describe('content parsing & semantic normalization', () => {
     expect(normalized.codeWalkthrough).toBe('const x = 1;');
     expect(normalized.evidence.authorIntent[0]).toContain('Author intent');
   });
+
+  test('repairs a response that is missing only the opening root brace', () => {
+    const payload = '"summary":{"problem":"P","solution":"S"},"quiz":[]}';
+    const parsed = parseModelContent(payload);
+    expect(parsed.summary.problem).toBe('P');
+    expect(parsed.summary.solution).toBe('S');
+  });
+
+  test('still rejects genuinely truncated JSON', () => {
+    expect(() => parseModelContent('{"summary":{"problem":"unfinished')).toThrow(/truncado|Failed to parse JSON/);
+  });
+});
+
+describe('walkthrough line references', () => {
+  test('prefixes numeric ranges with L and leaves symbols untouched', () => {
+    const content = normalizeSemanticContent({
+      summary: { problem: 'P', solution: 'S' },
+      mechanism: { overview: 'M' },
+      walkthrough: [
+        {
+          groupTitle: 'Group',
+          files: [
+            { path: 'a.ts', keyLines: '22-30' },
+            { path: 'b.ts', keyLines: 'calculatePagination' },
+            { path: 'c.ts', keyLines: 'L42' }
+          ]
+        }
+      ]
+    });
+
+    const html = renderEditorialDocument({
+      prNumber: '1',
+      prTitle: 'P',
+      generationDate: 'Date',
+      language: 'en',
+      model: 'test/model',
+      content,
+      usage: { total_tokens: 1 }
+    });
+
+    expect(html).toContain('>L22-30<');
+    expect(html).toContain('>calculatePagination<');
+    expect(html).toContain('>L42<');
+    expect(html).not.toContain('LcalculatePagination');
+    expect(html).not.toContain('LL42');
+  });
 });
 
 describe('editorial HTML template rendering', () => {
@@ -439,5 +485,100 @@ describe('Markdown PR comment generation', () => {
     expect(sanitizeInlineText('x'.repeat(50), 10)).toHaveLength(10);
     expect(safeCodeSpan('a`b\nc')).toBe('a b c');
     expect(safeCodeSpan('x'.repeat(300))).toHaveLength(200);
+  });
+});
+
+describe('localized simulation and quiz labels', () => {
+  const simulation = {
+    enabled: true,
+    title: 'Classificador de Erros HTTP',
+    description: 'Teste os cenários',
+    rule: '4xx não é retentável',
+    scenarios: [
+      {
+        label: 'HTTP 400',
+        outcome: { action: 'Rejeitar Imediatamente', status: 'known_rejection' },
+        explanation: 'Erro de cliente.'
+      },
+      {
+        outcome: { action: 'Retentar', status: 'rate_limited' },
+        explanation: 'Aguarda Retry-After.'
+      }
+    ]
+  };
+
+  test('renders Portuguese kicker, scenario fallback, and outcome status', () => {
+    const html = renderSimulationSection(simulation, 'pt-BR');
+
+    expect(html).toContain('Simulação Interativa');
+    expect(html).not.toContain('Interactive Simulation');
+    expect(html).toContain('Cenário 2');
+    expect(html).toContain('Resultado Avaliado');
+    expect(html).toContain('known_rejection');
+    expect(html).toContain('id="sim-outcome-status"');
+  });
+
+  test('document script updates the localized outcome status', () => {
+    const html = renderEditorialDocument({
+      prNumber: '8',
+      prTitle: 'fix: teste localizado',
+      generationDate: '10 de novembro de 2026',
+      language: 'pt-BR',
+      model: 'test/model',
+      content: {
+        summary: { problem: 'P', solution: 'S' },
+        mechanism: { overview: 'M' },
+        simulation
+      },
+      usage: { total_tokens: 1 }
+    });
+
+    expect(html).toContain("getElementById('sim-outcome-status')");
+    expect(html).toContain('Simulação Interativa');
+    expect(html).toContain('Cenário 2');
+  });
+
+  test('hides the status badge when a scenario has no status', () => {
+    const html = renderSimulationSection(
+      {
+        enabled: true,
+        scenarios: [{ label: 'Only', outcome: { action: 'Proceed' }, explanation: 'No status' }]
+      },
+      'en'
+    );
+
+    expect(html).toContain('id="sim-outcome-status" hidden');
+    expect(html).toContain('Interactive Simulation');
+  });
+
+  test('localizes quiz question counts for singular and plural', () => {
+    const question = {
+      question: 'Pergunta?',
+      options: ['A', 'B'],
+      correctOptionIndex: 0,
+      explanations: ['Certa', 'Errada']
+    };
+
+    expect(renderQuizHtml([question], 'pt-BR')).toContain('1 pergunta');
+    expect(renderQuizHtml([question], 'pt-BR')).not.toContain('1 question');
+    expect(renderQuizHtml([question, question], 'pt-BR')).toContain('2 perguntas');
+    expect(renderQuizHtml([question, question], 'en')).toContain('2 questions');
+  });
+
+  test('keeps the meta CSP free of directives that browsers ignore', () => {
+    const html = renderEditorialDocument({
+      prNumber: '9',
+      prTitle: 'fix: csp',
+      generationDate: 'date',
+      language: 'en',
+      model: 'test/model',
+      content: { summary: { problem: 'P' } },
+      usage: { total_tokens: 1 }
+    });
+
+    expect(html).toContain('http-equiv="Content-Security-Policy"');
+    expect(html).toContain('script-src &#39;nonce-');
+    expect(html).not.toContain('frame-ancestors');
+    expect(html).toContain('img-src data:');
   });
 });
